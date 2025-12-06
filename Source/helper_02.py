@@ -1,120 +1,122 @@
-# helper_02.py
-# Xây dựng CNF từ board Hashiwokakero
-# Giả sử dùng pysat để encode CNF
-# Cần define biến logic, ràng buộc theo đề bài
-
+# Source/helper_02.py
 from pysat.formula import CNF
 from pysat.card import CardEnc
 
-def var_bridge(i1, j1, i2, j2, count):
-    """
-    Đánh số biến đại diện cho việc có 'count' cầu nối giữa đảo (i1,j1) và (i2,j2).
-    count = 1 hoặc 2 (vì tối đa 2 cầu nối)
-    Quy ước số biến cần nhất quán toàn bộ chương trình.
-    """
-    # Mã hóa biến: ví dụ một hàm băm hoặc đánh số tuần tự
-    # Ở đây ví dụ đơn giản: biến = (i1 * 1000000 + j1 * 10000 + i2 * 100 + j2) * 10 + count
-    # Giả sử board max 100x100
-    return (i1 * 1000000 + j1 * 10000 + i2 * 100 + j2) * 10 + count
-
-
 def generate_cnf(board):
-    """
-    Tạo CNF ràng buộc cho bài toán từ board.
-    Ràng buộc chính:
-    - Mỗi cặp đảo có tối đa 2 cầu
-    - Tổng cầu nối từ mỗi đảo bằng số trên đảo
-    - Cầu không chồng lên nhau, đi thẳng theo hàng hoặc cột
-    - Cầu không được đi qua đảo khác
-    - Kết nối thành 1 tập hợp liên thông (ràng buộc này phức tạp, có thể implement thêm)
-    """
     cnf = CNF()
+    n_rows = len(board)
+    n_cols = len(board[0])
+    
     islands = []
-    n = len(board)
-    m = len(board[0]) if n > 0 else 0
+    # Tìm các đảo và lưu thông tin
+    for r in range(n_rows):
+        for c in range(n_cols):
+            if board[r][c] > 0:
+                islands.append({'r': r, 'c': c, 'val': board[r][c], 'id': len(islands)})
 
-    # Tìm các đảo
-    for i in range(n):
-        for j in range(m):
-            if board[i][j] != 0:
-                islands.append((i, j, board[i][j]))
-
-    # Bước 1: Tạo biến cho các cầu nối có thể có giữa các đảo thẳng hàng ngang hoặc dọc
-    # Lấy từng cặp đảo thẳng hàng ngang hoặc dọc, tạo biến
-    edges = []  # list biến các cầu
-    for idx1, (x1, y1, val1) in enumerate(islands):
-        for idx2 in range(idx1 + 1, len(islands)):
-            x2, y2, val2 = islands[idx2]
-            # Kiểm tra cùng hàng hoặc cùng cột
-            if x1 == x2:
-                # cùng hàng, cầu nối theo cột
-                # Kiểm tra khoảng trống giữa 2 đảo
+    # 1. Xác định các cạnh khả thi (neighbors)
+    # Luật: Cầu đi thẳng, không xuyên qua đảo khác [cite: 56, 63]
+    possible_edges = []
+    for i in range(len(islands)):
+        u = islands[i]
+        for j in range(i + 1, len(islands)):
+            v = islands[j]
+            
+            # Kiểm tra cùng hàng (row)
+            if u['r'] == v['r']:
                 blocked = False
-                for y in range(min(y1, y2)+1, max(y1, y2)):
-                    if board[x1][y] != 0:
-                        blocked = True
-                        break
-                if blocked:
-                    continue
-                # Tạo biến bridge 1 và 2
-                v1 = var_bridge(x1, y1, x2, y2, 1)
-                v2 = var_bridge(x1, y1, x2, y2, 2)
-                edges.append(((x1, y1, x2, y2), (v1, v2)))
-
-            elif y1 == y2:
-                # cùng cột, cầu nối theo hàng
+                c_min, c_max = min(u['c'], v['c']), max(u['c'], v['c'])
+                # Check các ô ở giữa xem có bị chặn không
+                for k in range(c_min + 1, c_max):
+                    if board[u['r']][k] > 0: blocked = True; break
+                if not blocked:
+                    possible_edges.append({'u': i, 'v': j, 'type': 'row', 'r': u['r'], 'c_min': c_min, 'c_max': c_max})
+            
+            # Kiểm tra cùng cột (col)
+            elif u['c'] == v['c']:
                 blocked = False
-                for x in range(min(x1, x2)+1, max(x1, x2)):
-                    if board[x][y1] != 0:
-                        blocked = True
-                        break
-                if blocked:
-                    continue
-                v1 = var_bridge(x1, y1, x2, y2, 1)
-                v2 = var_bridge(x1, y1, x2, y2, 2)
-                edges.append(((x1, y1, x2, y2), (v1, v2)))
+                r_min, r_max = min(u['r'], v['r']), max(u['r'], v['r'])
+                for k in range(r_min + 1, r_max):
+                    if board[k][u['c']] > 0: blocked = True; break
+                if not blocked:
+                    possible_edges.append({'u': i, 'v': j, 'type': 'col', 'c': u['c'], 'r_min': r_min, 'r_max': r_max})
 
-    # Bước 2: Ràng buộc mỗi cặp cầu không vượt quá 2
-    for edge, (v1, v2) in edges:
-        # v1 và v2 không thể đồng thời đúng nếu muốn giới hạn ở max 2 (đã đúng rồi)
-        # Thêm ràng buộc không có cầu hơn 2? Tối đa 2 -> đã thể hiện bằng biến
-        # Ràng buộc logic: biến v1 và v2 đại diện số cầu 1 hoặc 2
-        # Nếu dùng biến True/False cho "có cầu 1" và "có cầu 2", 
-        # thêm ràng buộc: Nếu có 2 cầu thì phải có cầu 1 cũng đúng? Có thể xem như thế này:
-        # Nhưng đơn giản có thể không cần ràng buộc thêm ở đây.
-        pass
+    # 2. Tạo biến logic [cite: 84, 251]
+    # Mỗi cạnh có 2 biến: v1 (có ít nhất 1 cầu), v2 (có 2 cầu)
+    var_map = {} 
+    counter = 1
+    edge_vars = [] 
 
-    # Bước 3: Ràng buộc tổng số cầu nối tại mỗi đảo bằng số trên đảo
-    # Tổng các cầu đi ra đảo = số ghi trên đảo
-    # Tính tổng cầu nối của mỗi đảo qua các edges chứa đảo đó
+    for idx, edge in enumerate(possible_edges):
+        v1 = counter; counter += 1
+        v2 = counter; counter += 1
+        
+        var_map[(idx, 1)] = v1
+        var_map[(idx, 2)] = v2
+        edge_vars.append({'v1': v1, 'v2': v2})
 
-    for i_x, i_y, val in islands:
-        vars_for_island = []
-        for edge, (v1, v2) in edges:
-            x1, y1, x2, y2 = edge
-            if (i_x, i_y) == (x1, y1) or (i_x, i_y) == (x2, y2):
-                # 1 cầu = 1*var(v1) + 2*var(v2)
-                # Biến v1, v2 đều là biến boolean (True/False)
-                # Ta cần biểu diễn tổng số cầu (từ biến boolean) = val
-                # Tuy nhiên pysat không hỗ trợ trực tiếp tổng trọng số
-                # Giải pháp: dùng các biến phụ hoặc dùng ràng buộc bất kỳ
-                # Ở đây tạm dùng ràng buộc: sum(v1 * 1 + v2 * 2) = val
-                # Cách làm có thể dùng ràng buộc ràng buộc đa ngôi (cardinality)
-                vars_for_island.append((v1, 1))
-                vars_for_island.append((v2, 2))
+        # Ràng buộc cơ bản: Nếu có cầu 2 thì phải có cầu 1 (Logic: v2 -> v1 <=> -v2 OR v1)
+        # [cite: 254] (Luật tối đa 2 cầu)
+        cnf.append([-v2, v1])
 
-        # TODO: biểu diễn ràng buộc tổng này dưới dạng CNF
-        # Giải pháp: có thể dùng thư viện ràng buộc trọng số hoặc chuyển sang CNF phức tạp
-        # Ở đây để demo tạm không hiện thực chi tiết
+    # 3. LUẬT SỐ HỌC: Tổng cầu nối vào đảo = Giá trị đảo [cite: 66, 258-260]
+    for island_idx, island in enumerate(islands):
+        literals = []
+        # Gom tất cả các biến cầu nối vào đảo này
+        for edge_idx, edge in enumerate(possible_edges):
+            if edge['u'] == island_idx or edge['v'] == island_idx:
+                v1 = edge_vars[edge_idx]['v1']
+                v2 = edge_vars[edge_idx]['v2']
+                literals.append(v1)
+                literals.append(v2)
+        
+        # --- FIX LỖI CRASH (QUAN TRỌNG) ---
+        # Nếu tổng số dây khả thi < số yêu cầu của đảo => Vô nghiệm (UNSAT)
+        # Ví dụ: Đảo số 4 mà chỉ có 1 hàng xóm (max 2 dây) -> Không thể giải.
+        if len(literals) < island['val']:
+            print(f"DEBUG: Đảo tại ({island['r']},{island['c']}) val={island['val']} không đủ hàng xóm nối!")
+            cnf.append([]) # Thêm mệnh đề rỗng để ép UNSAT ngay lập tức
+            continue 
+        # ----------------------------------
 
-    # Bước 4: Ràng buộc cầu không được giao nhau
-    # Hai cầu không thể đi chồng lên nhau nếu cắt nhau theo chiều ngang/dọc
-    # Kiểm tra các cầu nối giao nhau và thêm ràng buộc phủ định 2 biến tương ứng
-    # TODO: hiện thực chi tiết
+        # Dùng CardEnc để sinh ràng buộc: sum(literals) == island['val']
+        cnf_sum = CardEnc.equals(lits=literals, bound=island['val'], encoding=1, top_id=counter)
+        
+        # Cập nhật counter biến
+        if cnf_sum.nv > counter:
+            counter = cnf_sum.nv
+        cnf.extend(cnf_sum.clauses)
 
-    # Bước 5: Ràng buộc liên thông (cầu nối tạo thành một thành phần liên thông)
-    # Phức tạp, có thể dùng thuật toán DFS trên graph cầu nối kết quả hoặc bổ sung ràng buộc đặc biệt
-    # Thường dùng thuật toán sau khi giải CNF kiểm tra, hoặc thêm ràng buộc đặc biệt
-    # TODO: bỏ qua hoặc implement nâng cao
+    # 4. LUẬT KHÔNG CẮT NHAU [cite: 63, 257]
+    # Cầu ngang và cầu dọc giao nhau không được cùng tồn tại
+    for i in range(len(possible_edges)):
+        for j in range(i + 1, len(possible_edges)):
+            e1 = possible_edges[i]
+            e2 = possible_edges[j]
+            
+            # Chỉ xét 1 ngang - 1 dọc
+            if e1['type'] == e2['type']: continue
+            
+            row_edge, col_edge = (e1, e2) if e1['type'] == 'row' else (e2, e1)
+            row_idx = (i) if e1['type'] == 'row' else (j)
+            col_idx = (j) if e1['type'] == 'row' else (i)
 
-    return cnf, edges
+            # Kiểm tra tọa độ giao cắt
+            if (col_edge['r_min'] < row_edge['r'] < col_edge['r_max']) and \
+               (row_edge['c_min'] < col_edge['c'] < row_edge['c_max']):
+                
+                # Nếu cắt nhau: Không được có cầu ở cả 2 cạnh
+                # Ràng buộc: NOT(row có cầu) OR NOT(col có cầu)
+                # Biến v1 đại diện cho việc "có cầu"
+                v1_row = edge_vars[row_idx]['v1']
+                v1_col = edge_vars[col_idx]['v1']
+                cnf.append([-v1_row, -v1_col])
+
+    # Mapping lại biến để trả về cho hàm main decode
+    final_var_map = {}
+    for idx, edge in enumerate(possible_edges):
+        u, v = edge['u'], edge['v']
+        final_var_map[(u, v, 1)] = edge_vars[idx]['v1']
+        final_var_map[(u, v, 2)] = edge_vars[idx]['v2']
+
+    return cnf, {"var_map": final_var_map, "islands": islands}
