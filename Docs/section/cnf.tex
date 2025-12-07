@@ -1,0 +1,123 @@
+\section{Mô hình hóa bài toán}
+Bài toán Hashiwokakero được mô hình hóa thành bài toán thỏa mãn mệnh đề (SAT) và công thức dạng chuẩn hội (CNF) được sử dụng để biểu diễn luật chơi.
+
+\subsection{Định nghĩa biến logic}
+Giả sử ta có \(n \in \mathbb{N}^{\ast}\) hòn đảo, được đánh số lần lượt 
+\[
+1,\, 2,\, \ldots,\, n.
+\]
+Mỗi đảo \(i\) được gán một giá trị \(\deg(i)\), biểu diễn số cầu cần được nối đến đảo đó
+(trong đó \(i = 1, 2, \ldots, n\)).
+
+\medskip
+
+Để mô hình hóa bài toán dưới dạng logic mệnh đề, ta giới thiệu các biến Boolean sau.
+\paragraph{Biến số lượng cầu}
+Ta định nghĩa biến Boolean
+\[
+C_{i,j}^k, \qquad i < j,\quad k \in \{1,2\},
+\]
+với ý nghĩa: giữa hai đảo \(i\) và \(j\) tồn tại đúng \(k\) cầu.
+
+\paragraph{Biến cây khung}
+Để mô hình hóa tính liên thông của toàn bộ hệ thống cầu, ta định nghĩa thêm hai họ biến:
+\[
+Par(i,j) \quad (i \neq j), \qquad Desc(i,j) \quad (i \neq j),
+\]
+trong đó:
+\begin{itemize}
+    \item \(Par(i,j)\): \(j\) là cha của \(i\) trong cây khung có gốc tại đảo \(1\),
+    \item \(Desc(i,j)\): \(j\) là tổ tiên của \(i\) trong cây khung đó.
+\end{itemize}
+
+\subsection{Các ràng buộc logic}
+
+\subsubsection{Giới hạn số cầu giữa hai đảo}
+
+Hai đảo chỉ có thể nối bằng 0, 1 hoặc 2 cầu:
+\[
+\forall i<j:\qquad \lnot C_{i,j}^1 \lor \lnot C_{i,j}^2.
+\]
+
+\subsubsection{Cầu chỉ thẳng đứng hoặc thẳng ngang}
+
+Với hai đảo \(i\) và \(j\) không cùng hàng hay không cùng cột:
+\[
+\lnot C_{i,j}^1 \land \lnot C_{i,j}^2.
+\]
+
+\subsubsection{Cầu không đi xuyên qua đảo khác}
+
+Nếu tồn tại đảo \(k\) nằm giữa \(i\) và \(j\) trên cùng hàng hoặc cột:
+\[
+\lnot C_{i,j}^1 \land \lnot C_{i,j}^2.
+\]
+
+\subsubsection{Cầu không được cắt nhau}
+
+Với hai cặp đảo \((i,j)\) và \((k,l)\) có đường cầu cắt nhau:
+\[
+(\lnot C_{i,j}^{a} \;\lor\; \lnot C_{k,l}^{b}), \qquad a,b \in \{1,2\}.
+\]
+
+
+\subsubsection{Tổng số cầu nối với một đảo bằng đúng số được ghi trên đảo}
+
+\paragraph{Tập hợp các cầu tiềm năng của một đảo}
+Ký hiệu tập các biến cầu liên quan đến đảo \(i\):
+\[
+B(i) = \{\, C_{i,j}^1,\, C_{i,j}^2,\, C_{j,i}^1,\, C_{j,i}^2 \mid j \neq i \,\}.
+\]
+
+Ràng buộc tổng bậc đúng bằng \(\deg(i)\) tương đương hai điều kiện:
+
+\paragraph{Không vượt quá bậc yêu cầu:}
+\[
+\bigwedge_{\substack{S \subseteq B(i) \\ |S| = \deg(i)+1}}
+\left( \bigvee_{x \in S} \lnot x \right).
+\]
+
+\paragraph{Không thiếu so với bậc yêu cầu:}
+\[
+\bigwedge_{\substack{S \subseteq B(i) \\ |S| = |B(i)|+1-\deg(i)}}
+\left( \bigvee_{x \in S} x \right).
+\]
+
+\subsubsection{Liên thông: ràng buộc về cây khung}
+
+\paragraph{Gốc không có cha:}
+\[
+\forall j \neq 1:\quad \lnot Par(1,j).
+\]
+
+\paragraph{Mỗi đỉnh khác gốc có đúng một cha:}
+\[
+\forall i \neq 1:\quad
+\left(
+\bigwedge_{i \neq j,\, j \neq k\,,k \neq i} 
+(\lnot Par(i,j) \lor \lnot Par(i,k))
+\right)
+\;\land\;
+\left( \bigvee_{j \neq i} Par(i,j) \right).
+\]
+
+\paragraph{Cha và con phải có cầu nối:}
+\[
+\forall i,j:\quad \lnot Par(i,j) \lor C_{i,j}^1 \lor C_{i,j}^2.
+\]
+
+\paragraph{Mối quan hệ cha–con kéo theo quan hệ tổ tiên:}
+\[
+\forall i \neq j:\quad \lnot Par(i,j) \lor Desc(i,j).
+\]
+
+\paragraph{Tính bắc cầu của tổ tiên:}
+\[
+\forall i, \forall j, \forall k,\; i \neq j,\; j \neq k,\; k \neq i:\quad 
+\lnot Par(i,j) \;\lor\; \lnot Par(j,k) \;\lor\; Par(i,k).
+\]
+
+\paragraph{Không tồn tại vòng trong cây khung:}
+\[
+\forall i \neq j:\quad \lnot Par(i,j) \lor \lnot Par(j,i).
+\]

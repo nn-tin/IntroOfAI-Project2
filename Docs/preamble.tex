@@ -1,0 +1,40 @@
+\usepackage{graphicx}
+\usepackage[margin=1in]{geometry}
+\usepackage{tikz}
+
+% font & tiếng việt
+\usepackage{fontspec}       % cần cho Unicode & OpenType fonts
+\usepackage{polyglossia}    % thay thế babel
+\setdefaultlanguage{vietnamese}
+
+
+
+% Import
+\usepackage{import}
+
+% \setmainfont{Times New Roman}  % hoặc font khác hỗ trợ Unicode
+
+
+\usepackage[unicode]{hyperref}
+\usepackage{tabularray}
+% \usepackage{indentfirst}
+
+% APA reference format
+\usepackage{apacite}
+
+\usepackage{enumitem}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage[ruled,vlined]{algorithm2e}
+
+
+\addto\captionsvietnamese{%
+  \renewcommand{\refname}{Tài liệu tham khảo}%
+}
+% Config
+% \AtBeginDocument{\renewcommand{\refname}{Tài liệu tham khảo}}
+% \AtBeginDocument{\renewcommand{\listtablename}{Danh sách bảng}}
+\AtBeginDocument{\renewcommand{\tblrcontfootname}{Còn tiếp trang sau}}
+\AtBeginDocument{\renewcommand{\tblrcontheadname}{(Tiếp theo)}}
+\graphicspath{{image/}}
+\UseTblrLibrary{varwidth} 
+\UseTblrLibrary{diagbox}
