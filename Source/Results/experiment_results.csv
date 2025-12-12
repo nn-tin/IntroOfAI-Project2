@@ -1,0 +1,5 @@
+filename,solver,sat,time,timeout,connected
+input-01.txt,pysat,True,0.001861800003098324,False,True
+input-01.txt,astar,True,1.6996366000021226,False,True
+input-01.txt,backtracking,False,0.16212229999655392,False,False
+input-01.txt,bruteforce,False,0.15639329999976326,False,False

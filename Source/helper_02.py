@@ -1,122 +1,191 @@
-# Source/helper_02.py
+# ====================== helper_02.py ==========================
+# Xử lý CNF, decode output SAT, dựng lưới output + export kết quả
 from pysat.formula import CNF
 from pysat.card import CardEnc
+from helper_01 import read_input
+import os
 
 def generate_cnf(board):
     cnf = CNF()
-    n_rows = len(board)
-    n_cols = len(board[0])
-    
+    R, C = len(board), len(board[0])
+
+    # 1) Xác định đảo (islands)
     islands = []
-    # Tìm các đảo và lưu thông tin
-    for r in range(n_rows):
-        for c in range(n_cols):
+    for r in range(R):
+        for c in range(C):
             if board[r][c] > 0:
-                islands.append({'r': r, 'c': c, 'val': board[r][c], 'id': len(islands)})
+                islands.append({"r": r, "c": c, "val": board[r][c], "id": len(islands)})
 
-    # 1. Xác định các cạnh khả thi (neighbors)
-    # Luật: Cầu đi thẳng, không xuyên qua đảo khác [cite: 56, 63]
-    possible_edges = []
-    for i in range(len(islands)):
-        u = islands[i]
-        for j in range(i + 1, len(islands)):
-            v = islands[j]
-            
-            # Kiểm tra cùng hàng (row)
-            if u['r'] == v['r']:
-                blocked = False
-                c_min, c_max = min(u['c'], v['c']), max(u['c'], v['c'])
-                # Check các ô ở giữa xem có bị chặn không
-                for k in range(c_min + 1, c_max):
-                    if board[u['r']][k] > 0: blocked = True; break
-                if not blocked:
-                    possible_edges.append({'u': i, 'v': j, 'type': 'row', 'r': u['r'], 'c_min': c_min, 'c_max': c_max})
-            
-            # Kiểm tra cùng cột (col)
-            elif u['c'] == v['c']:
-                blocked = False
-                r_min, r_max = min(u['r'], v['r']), max(u['r'], v['r'])
-                for k in range(r_min + 1, r_max):
-                    if board[k][u['c']] > 0: blocked = True; break
-                if not blocked:
-                    possible_edges.append({'u': i, 'v': j, 'type': 'col', 'c': u['c'], 'r_min': r_min, 'r_max': r_max})
+    # 2) Tìm tất cả các cầu có thể nối (edges)
+    edges = []
+    n_islands = len(islands)
+    for i in range(n_islands):
+        a = islands[i]
+        for j in range(i + 1, n_islands):
+            b = islands[j]
 
-    # 2. Tạo biến logic [cite: 84, 251]
-    # Mỗi cạnh có 2 biến: v1 (có ít nhất 1 cầu), v2 (có 2 cầu)
-    var_map = {} 
-    counter = 1
-    edge_vars = [] 
+            # Kiểm tra cầu ngang
+            if a["r"] == b["r"]:
+                r = a["r"]
+                c1, c2 = sorted([a["c"], b["c"]])
+                # Đảm bảo không có đảo hoặc chướng ngại vật ở giữa
+                if all(board[r][k] == 0 for k in range(c1 + 1, c2)):
+                    edges.append({"u": i, "v": j, "type": "H", "r": r, "c1": c1, "c2": c2})
 
-    for idx, edge in enumerate(possible_edges):
-        v1 = counter; counter += 1
-        v2 = counter; counter += 1
+            # Kiểm tra cầu dọc
+            if a["c"] == b["c"]:
+                c = a["c"]
+                r1, r2 = sorted([a["r"], b["r"]])
+                if all(board[k][c] == 0 for k in range(r1 + 1, r2)):
+                    edges.append({"u": i, "v": j, "type": "V", "c": c, "r1": r1, "r2": r2})
+
+    # 3) Khai báo biến SAT
+    # var_map lưu cặp biến [v1, v2] cho mỗi cạnh (index trong edges)
+    # v1: Có ít nhất 1 cầu
+    # v2: Có 2 cầu
+    var_map = {}
+    var_count = 1
+    
+    for idx, e in enumerate(edges):
+        v1 = var_count
+        v2 = var_count + 1
+        var_count += 2
+        var_map[idx] = (v1, v2)
         
-        var_map[(idx, 1)] = v1
-        var_map[(idx, 2)] = v2
-        edge_vars.append({'v1': v1, 'v2': v2})
-
-        # Ràng buộc cơ bản: Nếu có cầu 2 thì phải có cầu 1 (Logic: v2 -> v1 <=> -v2 OR v1)
-        # [cite: 254] (Luật tối đa 2 cầu)
+        # Ràng buộc logic: Nếu có cầu 2 thì bắt buộc phải có cầu 1 (v2 -> v1)
+        # Tương đương: -v2 OR v1
         cnf.append([-v2, v1])
 
-    # 3. LUẬT SỐ HỌC: Tổng cầu nối vào đảo = Giá trị đảo [cite: 66, 258-260]
-    for island_idx, island in enumerate(islands):
-        literals = []
-        # Gom tất cả các biến cầu nối vào đảo này
-        for edge_idx, edge in enumerate(possible_edges):
-            if edge['u'] == island_idx or edge['v'] == island_idx:
-                v1 = edge_vars[edge_idx]['v1']
-                v2 = edge_vars[edge_idx]['v2']
-                literals.append(v1)
-                literals.append(v2)
+    # 4) Ràng buộc tổng số cầu nối mỗi đảo
+    for i, island in enumerate(islands):
+        deg = island["val"]
+        lits = []
         
-        # --- FIX LỖI CRASH (QUAN TRỌNG) ---
-        # Nếu tổng số dây khả thi < số yêu cầu của đảo => Vô nghiệm (UNSAT)
-        # Ví dụ: Đảo số 4 mà chỉ có 1 hàng xóm (max 2 dây) -> Không thể giải.
-        if len(literals) < island['val']:
-            print(f"DEBUG: Đảo tại ({island['r']},{island['c']}) val={island['val']} không đủ hàng xóm nối!")
-            cnf.append([]) # Thêm mệnh đề rỗng để ép UNSAT ngay lập tức
-            continue 
-        # ----------------------------------
+        # Tìm tất cả cạnh nối với đảo i
+        for idx, e in enumerate(edges):
+            if e["u"] == i or e["v"] == i:
+                # Thêm cả biến v1 và v2 vào danh sách đếm
+                # CardEnc sẽ đếm số lượng biến True. Nếu v1=True, v2=True => cộng 2
+                lits.append(var_map[idx][0]) 
+                lits.append(var_map[idx][1])
 
-        # Dùng CardEnc để sinh ràng buộc: sum(literals) == island['val']
-        cnf_sum = CardEnc.equals(lits=literals, bound=island['val'], encoding=1, top_id=counter)
-        
-        # Cập nhật counter biến
-        if cnf_sum.nv > counter:
-            counter = cnf_sum.nv
-        cnf.extend(cnf_sum.clauses)
+        # Nếu tổng số cầu khả thi < giá trị đảo => Vô nghiệm ngay lập tức (tránh lỗi CardEnc)
+        if len(lits) < deg:
+            print(f"Lỗi: Đảo tại ({island['r']},{island['c']}) cần {deg} cầu nhưng chỉ có thể nối tối đa {len(lits)}.")
+            # Thêm clause rỗng để báo UNSAT ngay
+            cnf.append([]) 
+            continue
 
-    # 4. LUẬT KHÔNG CẮT NHAU [cite: 63, 257]
-    # Cầu ngang và cầu dọc giao nhau không được cùng tồn tại
-    for i in range(len(possible_edges)):
-        for j in range(i + 1, len(possible_edges)):
-            e1 = possible_edges[i]
-            e2 = possible_edges[j]
+        # Ràng buộc: Tổng số biến active phải bằng đúng giá trị đảo
+        enc = CardEnc.equals(lits=lits, bound=deg, encoding=1, top_id=var_count)
+        var_count = max(var_count, enc.nv)
+        cnf.extend(enc.clauses)
+
+    # 5) Ràng buộc không cho cầu cắt nhau (Crossing Logic - ĐÃ SỬA)
+    for i, e1 in enumerate(edges):
+        for j in range(i + 1, len(edges)):
+            e2 = edges[j]
             
-            # Chỉ xét 1 ngang - 1 dọc
-            if e1['type'] == e2['type']: continue
+            cross = False
+            # Chỉ xét trường hợp 1 ngang (H) cắt 1 dọc (V)
+            if e1["type"] == "H" and e2["type"] == "V":
+                if e2["r1"] < e1["r"] < e2["r2"] and e1["c1"] < e2["c"] < e1["c2"]:
+                    cross = True
+            elif e1["type"] == "V" and e2["type"] == "H":
+                if e1["r1"] < e2["r"] < e1["r2"] and e2["c1"] < e1["c"] < e2["c2"]:
+                    cross = True
             
-            row_edge, col_edge = (e1, e2) if e1['type'] == 'row' else (e2, e1)
-            row_idx = (i) if e1['type'] == 'row' else (j)
-            col_idx = (j) if e1['type'] == 'row' else (i)
-
-            # Kiểm tra tọa độ giao cắt
-            if (col_edge['r_min'] < row_edge['r'] < col_edge['r_max']) and \
-               (row_edge['c_min'] < col_edge['c'] < row_edge['c_max']):
+            if cross:
+                # Logic đúng: Không thể đồng thời tồn tại cầu ở cạnh i VÀ cạnh j
+                # Chỉ cần cấm biến v1 (cầu thứ nhất) là đủ.
+                u1 = var_map[i][0]
+                v1 = var_map[j][0]
+                cnf.append([-u1, -v1])
                 
-                # Nếu cắt nhau: Không được có cầu ở cả 2 cạnh
-                # Ràng buộc: NOT(row có cầu) OR NOT(col có cầu)
-                # Biến v1 đại diện cho việc "có cầu"
-                v1_row = edge_vars[row_idx]['v1']
-                v1_col = edge_vars[col_idx]['v1']
-                cnf.append([-v1_row, -v1_col])
+    return cnf, {"islands": islands, "edges": edges, "var_map": var_map}
 
-    # Mapping lại biến để trả về cho hàm main decode
-    final_var_map = {}
-    for idx, edge in enumerate(possible_edges):
-        u, v = edge['u'], edge['v']
-        final_var_map[(u, v, 1)] = edge_vars[idx]['v1']
-        final_var_map[(u, v, 2)] = edge_vars[idx]['v2']
 
-    return cnf, {"var_map": final_var_map, "islands": islands}
+
+# =====================================================================
+# 2) Decode SAT → list (u,v,count,type)
+# =====================================================================
+def decode_output(model, meta):
+    bridges=[]
+    for idx,e in enumerate(meta["edges"]):
+        cnt=0
+        if meta["var_map"][(idx,1)] in model: cnt=1
+        if meta["var_map"][(idx,2)] in model: cnt=2
+        if cnt>0:
+            bridges.append({
+                "u":e["u"],"v":e["v"],"count":cnt,"dir":e["type"]
+            })
+    return bridges
+
+
+# =====================================================================
+# 3) Build output grid (final)
+# =====================================================================
+def build_output_grid(board, meta, bridges):
+    R,C = len(board),len(board[0])
+    out=[["0" for _ in range(C)] for _ in range(R)]
+
+    # Gán đảo
+    for isl in meta["islands"]:
+        out[isl["r"]][isl["c"]] = str(isl["val"])
+
+    # Gán cầu
+    for b in bridges:
+        a = meta["islands"][b["u"]]
+        c = meta["islands"][b["v"]]
+
+        if b["dir"]=="H":
+            row=a["r"]
+            x1,x2 = sorted([a["c"],c["c"]])
+            sym = "-" if b["count"]==1 else "="
+            for col in range(x1+1,x2):
+                out[row][col]=sym
+
+        if b["dir"]=="V":
+            col=a["c"]
+            y1,y2 = sorted([a["r"],c["r"]])
+            sym = "|" if b["count"]==1 else "║"  # Dùng ký tự dễ nhìn hơn thay vì $
+            for row in range(y1+1,y2):
+                out[row][col]=sym
+
+    return out
+
+
+# =====================================================================
+# 4) Export output to txt
+# =====================================================================
+def export_output_grid(grid, filename="output.txt"):
+    os.makedirs("Outputs",exist_ok=True)
+    path=f"Outputs/{filename}"
+
+    with open(path,"w",encoding="utf-8") as f:
+        for row in grid:
+            f.write("[ " + " , ".join(f'"{x}"' for x in row) + " ]\n")
+
+    print(f"✔ Output saved → {path}")
+    return path
+
+
+# =====================================================================
+# 5) Hàm main test (bạn cần thay dòng tạo model bằng gọi solver thật)
+# =====================================================================
+def main():
+    input_path = "Inputs/input-01.txt"  # Thay đường dẫn nếu cần
+
+    board = read_input(input_path)
+
+    print("Board đầu vào:")
+    for row in board:
+        print(row)
+
+    cnf, meta = generate_cnf(board)
+    print(f"Toàn bộ mệnh đề CNF ({len(cnf.clauses)} mệnh đề):")
+    for clause in cnf.clauses:
+        print(clause)
+
+if __name__ == "__main__":
+    main()

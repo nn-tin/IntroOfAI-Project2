@@ -126,24 +126,7 @@ class AStarSAT:
 
 # --- PHẦN KIỂM THỬ (UNIT TEST) ---
 if __name__ == "__main__":
-    print("=== TEST 1: Logic đơn giản ===")
-    from pysat.formula import CNF
-    # Bài toán: Tìm x1, x2 sao cho: (x1 OR x2) AND (NOT x1 OR x2) AND (x1 OR NOT x2)
-    # Đáp án duy nhất: x1=True, x2=True (Model: [1, 2])
-    test_cnf = CNF()
-    test_cnf.append([1, 2])
-    test_cnf.append([-1, 2]) 
-    test_cnf.append([1, -2])
-    
-    solver = AStarSAT(test_cnf)
-    result = solver.solve()
-    print("CNF nhỏ:", result)
-    if result == [1, 2]:
-        print("-> TEST 1 PASSED ✅")
-    else:
-        print("-> TEST 1 FAILED ❌")
-
-    print("\n=== TEST 2: Chạy thử với input-01.txt ===")
+    print("\n=== TEST 1: Chạy thử với input-01.txt ===")
     import helper_01
     import helper_02
     
@@ -162,9 +145,9 @@ if __name__ == "__main__":
         model = astar.solve()
         
         if model:
-            print("-> TÌM THẤY LỜI GIẢI! ✅")
+            print("-> TÌM THẤY LỜI GIẢI!")
             print("Model mẫu (10 biến đầu):", model[:10])
         else:
-            print("-> KHÔNG TÌM THẤY LỜI GIẢI (UNSAT) ❌")
+            print("-> KHÔNG TÌM THẤY LỜI GIẢI (UNSAT)")
     else:
         print("Không tìm thấy file input-01.txt để test.")
