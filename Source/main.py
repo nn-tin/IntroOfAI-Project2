@@ -27,9 +27,9 @@ from solver_pysat import run_pysat, check_connectivity_from_model, model_to_brid
 
 # ----------------- Config -----------------
 TIMEOUT_PYSAT = 60.0
-TIMEOUT_ASTAR = 30.0
-TIMEOUT_BACKTRACK = 10.0
-TIMEOUT_BRUTEFORCE = 10.0
+TIMEOUT_ASTAR = 180.0
+TIMEOUT_BACKTRACK = 180.0
+TIMEOUT_BRUTEFORCE = 180.0
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INPUTS_DIR = os.path.join(BASE_DIR, "Inputs")
@@ -38,7 +38,7 @@ RESULTS_DIR = os.path.join(BASE_DIR, "Results")
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-DEFAULT_INPUTS = [f"input-{i:02}.txt" for i in range(1, 6)]
+DEFAULT_INPUTS = [f"input-{i:02}.txt" for i in range(1, 11)]
 CSV_PATH = os.path.join(RESULTS_DIR, "experiment_results.csv")
 
 # ----------------- Utilities & multiprocessing worker -----------------
