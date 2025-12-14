@@ -1,153 +1,164 @@
 # Source/solver_astar.py
 import heapq
-import sys
-import os
 
 class AStarSAT:
-    def __init__(self, cnf):
-        # Convert clauses sang list để dễ xử lý
-        self.clauses = [list(c) for c in cnf.clauses] 
-        self.num_vars = cnf.nv
+    def __init__(self, cnf, meta):
+        self.meta = meta
+        self.islands = meta["islands"]
         
-    def heuristic(self, assignment):
-        # Heuristic: Số lượng mệnh đề CHƯA được thỏa mãn (Unsatisfied Clauses)
-        unsat_count = 0
-        for clause in self.clauses:
-            is_satisfied = False
-            for lit in clause:
-                # lit là số dương (biến) hoặc âm (NOT biến)
-                var = abs(lit)
-                val = assignment.get(var)
-                
-                if val is None: 
-                    continue # Biến chưa gán -> coi như chưa thỏa mãn mệnh đề này
-                
-                # Nếu lit > 0 và val = True -> True
-                # Nếu lit < 0 và val = False -> True
-                if (lit > 0 and val) or (lit < 0 and not val):
-                    is_satisfied = True
-                    break
+        # --- TỐI ƯU 1: SẮP XẾP CẠNH (Heuristic Static) ---
+        # Ưu tiên duyệt các cạnh nối với đảo có giá trị lớn hoặc đảo "cô đơn" (ít hàng xóm)
+        # Giống như chiến thuật điền Sudoku: điền ô khó trước.
+        self.edges = sorted(
+            meta["edges"], 
+            key=lambda e: (self.islands[e["u"]]["val"] + self.islands[e["v"]]["val"]),
+            reverse=True # Ưu tiên đảo lớn trước
+        )
+        
+        self.n_edges = len(self.edges)
+        self.var_map = meta["var_map"]
+        
+        # Pre-compute neighbors cho việc tính toán nhanh
+        self.island_connected_edges = {i: [] for i in range(len(self.islands))}
+        for idx, e in enumerate(self.edges): # Lưu ý: dùng index của list đã sort
+            self.island_connected_edges[e["u"]].append(idx)
+            self.island_connected_edges[e["v"]].append(idx)
+
+        # Pre-compute crossing (dựa trên edges đã sort)
+        self.crossing_pairs = self._find_crossing_pairs()
+
+    def _find_crossing_pairs(self):
+        pairs = []
+        for i in range(self.n_edges):
+            for j in range(i + 1, self.n_edges):
+                e1, e2 = self.edges[i], self.edges[j]
+                if e1["type"] != e2["type"]:
+                    h, v = (e1, e2) if e1["type"]=="H" else (e2, e1)
+                    if v["r1"] < h["r"] < v["r2"] and h["c1"] < v["c"] < h["c2"]:
+                        pairs.append((i, j))
+        return pairs
+
+    def heuristic(self, idx, current_degrees):
+        """
+        Hàm heuristic nâng cao:
+        1. Trả về chi phí ước lượng (số cầu còn thiếu).
+        2. Trả về INFINITY nếu phát hiện nhánh cụt (Pruning).
+        """
+        h_score = 0
+        
+        for isl_id, isl in enumerate(self.islands):
+            needed = isl["val"] - current_degrees[isl_id]
             
-            if not is_satisfied:
-                unsat_count += 1
-        return unsat_count
+            if needed == 0: continue
+            if needed < 0: return 999999 # Đã bị thừa cầu -> Cắt nhánh
+            
+            # --- TỐI ƯU 2: LOOK-AHEAD PRUNING ---
+            # Tính "tiềm năng" còn lại của đảo này từ các cạnh CHƯA DUYỆT (index > idx)
+            potential = 0
+            connected_indices = self.island_connected_edges[isl_id]
+            
+            for edge_idx in connected_indices:
+                if edge_idx >= idx: # Cạnh này chưa được quyết định
+                    potential += 2 # Mỗi cạnh tối đa đóng góp 2 cầu
+            
+            # Nếu số cầu hiện tại + tất cả tiềm năng tương lai vẫn KHÔNG ĐỦ
+            # -> Nhánh này vô vọng (Dead end) -> Cắt nhánh ngay!
+            if needed > potential:
+                return 999999
+            
+            h_score += needed
+            
+        return h_score
 
     def solve(self):
-        # Priority Queue lưu tuple: (f_score, h_score, id_assign, assignment_dict)
-        # f = g + h. 
-        # g = số biến đã gán (chi phí đường đi)
-        # h = số mệnh đề chưa thỏa mãn (ước lượng còn lại)
+        # Priority Queue
+        start_degrees = tuple([0] * len(self.islands))
+        start_h = self.heuristic(0, start_degrees) # idx=0
+        start_assign = tuple([0] * self.n_edges)
         
-        start_assignment = {}
-        start_h = self.heuristic(start_assignment)
+        pq = []
+        # Push: (f, h, idx, assignments, degrees)
+        # idx: index của cạnh sắp xét
+        heapq.heappush(pq, (start_h, start_h, 0, start_assign, start_degrees))
         
-        # Open set
-        open_set = []
-        # id(assignment) để đảm bảo tính unique khi push vào heap
-        heapq.heappush(open_set, (start_h, start_h, id(start_assignment), start_assignment))
-        
-        visited_states = set() # Tránh lặp lại trạng thái (tập hợp các biến đã gán)
+        visited = set()
 
-        while open_set:
-            f, h, _, current_assign = heapq.heappop(open_set)
+        while pq:
+            f, h, idx, assigns, degs = heapq.heappop(pq)
             
-            # Key để lưu vết visited (tuple sorted của các biến đã gán)
-            state_key = tuple(sorted(current_assign.items()))
-            if state_key in visited_states:
-                continue
-            visited_states.add(state_key)
+            # Nếu h quá lớn nghĩa là nhánh cụt (do Look-ahead phát hiện)
+            if h >= 999999: continue
 
-            # Nếu h = 0: Tất cả mệnh đề đã được thỏa mãn?
-            # Cẩn thận: h=0 có thể do chưa gán biến nào thuộc mệnh đề đó (nếu logic heuristic lỏng)
-            # Nhưng với logic trên: val is None -> continue -> is_satisfied = False -> unsat += 1
-            # Nên nếu h=0 tức là TẤT CẢ mệnh đề đều đã có ít nhất 1 literal True.
-            if h == 0:
-                return self.format_model(current_assign)
-            
-            # Chọn biến tiếp theo để gán
-            # Chiến thuật: Chọn biến xuất hiện trong các mệnh đề chưa thỏa mãn đầu tiên
-            next_var = -1
-            # Cách đơn giản: Chọn biến có index nhỏ nhất chưa được gán
-            for v in range(1, self.num_vars + 1):
-                if v not in current_assign:
-                    next_var = v
-                    break
-            
-            if next_var == -1: 
-                continue 
-                
-            # Tạo 2 nhánh con: Gán True và Gán False
-            for val in [True, False]:
-                new_assign = current_assign.copy()
-                new_assign[next_var] = val
-                
-                # Tính heuristic mới
-                new_h = self.heuristic(new_assign)
-                
-                # Kiểm tra Conflict: Nếu có mệnh đề nào SAI HOÀN TOÀN (tất cả literal đều False) -> Cắt tỉa nhánh này
-                if not self.has_conflict(new_assign):
-                    g = len(new_assign)
-                    f = g + new_h 
-                    heapq.heappush(open_set, (f, new_h, id(new_assign), new_assign))
-                    
-        return None # Không tìm thấy
+            # Base case: Đã duyệt hết cạnh
+            if idx == self.n_edges:
+                if h == 0: return self._format_model(assigns)
+                else: continue
 
-    def has_conflict(self, assignment):
-        # Kiểm tra nhanh: Có clause nào mà tất cả literal đều đã được gán giá trị và đều False không?
-        for clause in self.clauses:
-            clause_false = True # Giả sử clause này sai
-            is_fully_assigned = True
+            # Visited check (Memoization)
+            state_key = (idx, degs)
+            if state_key in visited: continue
+            visited.add(state_key)
+
+            # Thử gán giá trị 0, 1, 2 cho cạnh thứ idx
+            edge = self.edges[idx]
+            u, v = edge["u"], edge["v"]
             
-            for lit in clause:
-                var = abs(lit)
-                if var not in assignment:
-                    is_fully_assigned = False
-                    clause_false = False # Còn biến chưa gán -> Chưa chắc sai -> Vẫn còn hy vọng
-                    break
+            # Heuristic ordering: Thử giá trị nào trước?
+            # Với A*, thứ tự push vào heap không quá quan trọng vì nó tự sort theo f,
+            # nhưng ta vẫn loop 0,1,2
+            for val in [0, 1, 2]:
+                # 1. Pruning cơ bản: Quá tải
+                new_deg_u = degs[u] + val
+                new_deg_v = degs[v] + val
+                if new_deg_u > self.islands[u]["val"] or new_deg_v > self.islands[v]["val"]:
+                    continue
                 
-                val = assignment[var]
-                if (lit > 0 and val) or (lit < 0 and not val):
-                    clause_false = False # Có 1 cái True -> Clause này đúng
-                    break
-            
-            if clause_false: # Tất cả literal trong clause đều False
-                return True
+                # 2. Pruning Crossing
+                if val > 0 and self._check_crossing(idx, val, assigns):
+                    continue
+
+                # Tạo trạng thái mới
+                new_degs_list = list(degs)
+                new_degs_list[u] = new_deg_u
+                new_degs_list[v] = new_deg_v
+                new_degs = tuple(new_degs_list)
+                
+                # Tính Heuristic cho bước TIẾP THEO (idx + 1)
+                new_h = self.heuristic(idx + 1, new_degs)
+                
+                if new_h >= 999999: continue # Cắt nhánh sớm
+
+                new_g = idx + 1
+                new_f = new_g + new_h
+                
+                new_assigns = list(assigns)
+                new_assigns[idx] = val
+                
+                heapq.heappush(pq, (new_f, new_h, idx + 1, tuple(new_assigns), new_degs))
+                
+        return None
+
+    def _check_crossing(self, curr_idx, val, assigns):
+        for (i, j) in self.crossing_pairs:
+             other = -1
+             if i == curr_idx: other = j
+             elif j == curr_idx: other = i
+             
+             if other != -1 and other < curr_idx:
+                 if assigns[other] > 0:
+                     return True
         return False
 
-    def format_model(self, assignment):
-        # Chuyển đổi format về giống PySAT (list các số nguyên có dấu)
+    def _format_model(self, assignments):
+        # Vì ta đã sort self.edges, cần map lại đúng biến CNF gốc
         model = []
-        for v in range(1, self.num_vars + 1):
-            if assignment.get(v, False):
-                model.append(v)
-            else:
-                model.append(-v)
+        for idx, val in enumerate(assignments):
+            edge = self.edges[idx]
+            # Tìm index gốc của edge trong meta
+            orig_idx = self.meta["edges"].index(edge)
+            
+            v1, v2 = self.var_map[orig_idx]
+            if val == 0: model.extend([-v1, -v2])
+            elif val == 1: model.extend([v1, -v2])
+            elif val == 2: model.extend([v1, v2])
         return model
-
-# --- PHẦN KIỂM THỬ (UNIT TEST) ---
-if __name__ == "__main__":
-    print("\n=== TEST 1: Chạy thử với input-01.txt ===")
-    import helper_01
-    import helper_02
-    
-    # Đường dẫn file input
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    input_path = os.path.join(current_dir, 'Inputs', 'input-01.txt')
-    
-    if os.path.exists(input_path):
-        board = helper_01.read_input(input_path)
-        print("Đã đọc board từ input-01.txt")
-        cnf, data = helper_02.generate_cnf(board)
-        print(f"Sinh CNF: {cnf.nv} biến, {len(cnf.clauses)} mệnh đề.")
-        
-        print("Đang chạy A* solver (có thể mất vài giây)...")
-        astar = AStarSAT(cnf)
-        model = astar.solve()
-        
-        if model:
-            print("-> TÌM THẤY LỜI GIẢI!")
-            print("Model mẫu (10 biến đầu):", model[:10])
-        else:
-            print("-> KHÔNG TÌM THẤY LỜI GIẢI (UNSAT)")
-    else:
-        print("Không tìm thấy file input-01.txt để test.")

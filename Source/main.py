@@ -27,9 +27,9 @@ from solver_pysat import run_pysat, check_connectivity_from_model, model_to_brid
 
 # ----------------- Config -----------------
 TIMEOUT_PYSAT = 60.0
-TIMEOUT_ASTAR = 60.0
-TIMEOUT_BACKTRACK = 60.0
-TIMEOUT_BRUTEFORCE = 30.0
+TIMEOUT_ASTAR = 30.0
+TIMEOUT_BACKTRACK = 10.0
+TIMEOUT_BRUTEFORCE = 10.0
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INPUTS_DIR = os.path.join(BASE_DIR, "Inputs")
@@ -82,16 +82,16 @@ def run_with_timeout(target_fn, args=(), timeout=60.0):
         return False, payload, elapsed, False
     
 # ----------------- Solver wrappers -----------------
-def run_astar_proc(cnf):
-    ast = AStarSAT(cnf)
+def run_astar_proc(cnf, meta):
+    ast = AStarSAT(cnf, meta)
     return ast.solve()
 
-def run_backtracking_proc(cnf):
-    bt = BacktrackingSAT(cnf, timeout=None)
+def run_backtracking_proc(cnf, meta):
+    bt = BacktrackingSAT(cnf, meta, timeout=None)
     return bt.solve()
 
-def run_bruteforce_proc(cnf):
-    bf = BruteForceSAT(cnf, timeout=None)
+def run_bruteforce_proc(cnf, meta):
+    bf = BruteForceSAT(cnf, meta, timeout=None)
     return bf.solve()
 
 # ----------------- Experiment per file -----------------
@@ -122,7 +122,7 @@ def experiment_on_file(input_filename, solvers=("pysat","astar","backtracking","
     # 2) A*
     if "astar" in solvers:
         print("-> Running A*...")
-        ok, model, elapsed, timed_out = run_with_timeout(run_astar_proc, args=(cnf,), timeout=TIMEOUT_ASTAR)
+        ok, model, elapsed, timed_out = run_with_timeout(run_astar_proc, args=(cnf, meta), timeout=TIMEOUT_ASTAR)
         sat = (ok and model is not None)
         connected = False
         if sat:
@@ -137,7 +137,7 @@ def experiment_on_file(input_filename, solvers=("pysat","astar","backtracking","
     # 3) Backtracking
     if "backtracking" in solvers:
         print("-> Running Backtracking...")
-        ok, model, elapsed, timed_out = run_with_timeout(run_backtracking_proc, args=(cnf,), timeout=TIMEOUT_BACKTRACK)
+        ok, model, elapsed, timed_out = run_with_timeout(run_backtracking_proc, args=(cnf, meta), timeout=TIMEOUT_BACKTRACK)
         sat = (ok and model is not None)
         connected = False
         if sat:
@@ -152,7 +152,7 @@ def experiment_on_file(input_filename, solvers=("pysat","astar","backtracking","
     # 4) Brute-force
     if "bruteforce" in solvers:
         print("-> Running Brute-force...")
-        ok, model, elapsed, timed_out = run_with_timeout(run_bruteforce_proc, args=(cnf,), timeout=TIMEOUT_BRUTEFORCE)
+        ok, model, elapsed, timed_out = run_with_timeout(run_bruteforce_proc, args=(cnf, meta), timeout=TIMEOUT_BRUTEFORCE)
         sat = (ok and model is not None)
         connected = False
         if sat:
