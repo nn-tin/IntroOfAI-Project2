@@ -148,7 +148,7 @@ def build_output_grid(board, meta, bridges):
         if b["dir"]=="V":
             col=a["c"]
             y1,y2 = sorted([a["r"],c["r"]])
-            sym = "|" if b["count"]==1 else "║"  # Dùng ký tự dễ nhìn hơn thay vì $
+            sym = "|" if b["count"]==1 else "$"  # Dùng ký tự dễ nhìn hơn thay vì $
             for row in range(y1+1,y2):
                 out[row][col]=sym
 

@@ -5,7 +5,6 @@ class AStarSAT:
     def __init__(self, cnf, meta):
         self.meta = meta
         self.islands = meta["islands"]
-        
         # --- TỐI ƯU 1: SẮP XẾP CẠNH (Heuristic Static) ---
         # Ưu tiên duyệt các cạnh nối với đảo có giá trị lớn hoặc đảo "cô đơn" (ít hàng xóm)
         # Giống như chiến thuật điền Sudoku: điền ô khó trước.
