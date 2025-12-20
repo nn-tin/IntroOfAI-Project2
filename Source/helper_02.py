@@ -1,4 +1,4 @@
-# ====================== helper_02.py ==========================
+# helper_02.py 
 # Xử lý CNF, decode output SAT, dựng lưới output + export kết quả
 from pysat.formula import CNF
 from pysat.card import CardEnc

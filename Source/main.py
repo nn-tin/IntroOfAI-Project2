@@ -1,13 +1,10 @@
 # Source/main.py
 """
-Experiment runner for Hashiwokakero SAT:
-- Generate CNF (helper_02)
-- Solve by: PySAT(Glucose3), A*, Backtracking, Brute-force
-- Measure time, check connectivity, export outputs and CSV summary
-Usage:
-    python main.py                # runs default inputs (input-01.txt ... input-05.txt)
-    python main.py input-03.txt   # runs only that input
-    python main.py all            # run default batch
+Experiment runner for Hashiwokakero:
+- SAT solvers: PySAT, A* SAT, Backtracking SAT, Brute-force SAT
+- Graph solvers: A* Graph, Backtracking Graph
+- Measure time, node expanded, connectivity
+- Export outputs and CSV summary
 """
 
 import os
@@ -18,47 +15,48 @@ import multiprocessing as mp
 
 import helper_01
 import helper_02
-from helper_02 import build_output_grid, export_output_grid  # output helpers
+from helper_02 import build_output_grid, export_output_grid
 
+# ---------- SAT-based solvers ----------
 from solver_astar import AStarSAT
 from solver_backtracking import BacktrackingSAT
 from solver_bruteforce import BruteForceSAT
 from solver_pysat import run_pysat, check_connectivity_from_model, model_to_bridges
 
-# ----------------- Config -----------------
+# ---------- GRAPH-based solvers ----------
+from solver_astar_graph import AStarGraphSolver
+from solver_astar_graph import check_connectivity
+from solver_backtracking_graph import BacktrackingGraphSolver
+
+
+# ================= CONFIG =================
 TIMEOUT_PYSAT = 60.0
-TIMEOUT_ASTAR = 180.0
-TIMEOUT_BACKTRACK = 180.0
-TIMEOUT_BRUTEFORCE = 180.0
+TIMEOUT_ASTAR = 60.0
+TIMEOUT_BACKTRACK = 60.0
+TIMEOUT_BRUTEFORCE = 60.0
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INPUTS_DIR = os.path.join(BASE_DIR, "Inputs")
 OUTPUTS_DIR = os.path.join(BASE_DIR, "Outputs")
 RESULTS_DIR = os.path.join(BASE_DIR, "Results")
+
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 DEFAULT_INPUTS = [f"input-{i:02}.txt" for i in range(1, 11)]
 CSV_PATH = os.path.join(RESULTS_DIR, "experiment_results.csv")
 
-# ----------------- Utilities & multiprocessing worker -----------------
+
+# ================= MULTIPROCESSING =================
 def worker(q, fn, args):
-    """
-    Global worker function — MUST be global (not nested) for Windows multiprocessing.
-    Puts ("ok", result) or ("err", errmsg) into queue.
-    """
     try:
         res = fn(*args)
         q.put(("ok", res))
     except Exception as e:
         q.put(("err", repr(e)))
 
+
 def run_with_timeout(target_fn, args=(), timeout=60.0):
-    """
-    Run target_fn(*args) in separate process with timeout.
-    Returns: (success_flag, payload, elapsed_seconds, timed_out_flag)
-    payload is result (if success) or error string (if not success).
-    """
     q = mp.Queue()
     p = mp.Process(target=worker, args=(q, target_fn, args))
 
@@ -80,22 +78,47 @@ def run_with_timeout(target_fn, args=(), timeout=60.0):
         return True, payload, elapsed, False
     else:
         return False, payload, elapsed, False
-    
-# ----------------- Solver wrappers -----------------
+
+
+# ================= SOLVER WRAPPERS =================
 def run_astar_proc(cnf, meta):
-    ast = AStarSAT(cnf, meta)
-    return ast.solve()
+    solver = AStarSAT(cnf, meta, timeout=TIMEOUT_ASTAR)
+    return solver.solve()
+
 
 def run_backtracking_proc(cnf, meta):
-    bt = BacktrackingSAT(cnf, meta, timeout=None)
-    return bt.solve()
+    solver = BacktrackingSAT(cnf, meta, timeout=None)
+    return solver.solve()
+
 
 def run_bruteforce_proc(cnf, meta):
-    bf = BruteForceSAT(cnf, meta, timeout=None)
-    return bf.solve()
+    solver = BruteForceSAT(cnf, meta, timeout=None)
+    return solver.solve()
 
-# ----------------- Experiment per file -----------------
-def experiment_on_file(input_filename, solvers=("pysat","astar","backtracking","bruteforce")):
+
+def run_astar_graph_proc(meta):
+    solver = AStarGraphSolver(meta)
+    return solver.solve()   
+
+
+
+def run_backtracking_graph_proc(meta):
+    solver = BacktrackingGraphSolver(meta, timeout=None)
+    return solver.solve()   
+
+
+# ================= EXPERIMENT PER FILE =================
+def experiment_on_file(
+    input_filename,
+    solvers=(
+        "pysat",
+        "astar",
+        "astar_graph",
+        "backtracking",
+        "backtracking_graph",
+        "bruteforce",
+    ),
+):
     path = os.path.join(INPUTS_DIR, input_filename)
     if not os.path.exists(path):
         print(f"[SKIP] {input_filename} not found")
@@ -104,69 +127,210 @@ def experiment_on_file(input_filename, solvers=("pysat","astar","backtracking","
     print(f"\n=== Experiment: {input_filename} ===")
     board = helper_01.read_input(path)
     cnf, meta = helper_02.generate_cnf(board)
+
     rows = []
 
-    # 1) PySAT
+    # ---------- PySAT ----------
     if "pysat" in solvers:
         print("-> Running PySAT...")
-        model, elapsed, timed_out, connected = run_pysat(cnf, meta, timeout=TIMEOUT_PYSAT)
+        model, elapsed, timed_out, connected = run_pysat(
+            cnf, meta, timeout=TIMEOUT_PYSAT
+        )
         sat = model is not None
-        print(f"   PySAT: sat={sat}, time={elapsed:.4f}s, timeout={timed_out}, connected={connected}")
+
         if sat:
             bridges = model_to_bridges(meta, model)
             grid = build_output_grid(board, meta, bridges)
-            fname = input_filename.replace("input", "output").replace(".txt", "-pysat.txt")
+            fname = input_filename.replace(
+                "input", "output"
+            ).replace(".txt", "-pysat.txt")
             export_output_grid(grid, fname)
-        rows.append({"filename":input_filename, "solver":"pysat", "sat":sat, "time":elapsed, "timeout":timed_out, "connected":connected})
 
-    # 2) A*
+        rows.append({
+            "filename": input_filename,
+            "solver": "pysat",
+            "sat": sat,
+            "time": elapsed,
+            "node_expanded": None,
+            "timeout": timed_out,
+            "connected": connected,
+        })
+
+    # ---------- A* SAT ----------
     if "astar" in solvers:
-        print("-> Running A*...")
-        ok, model, elapsed, timed_out = run_with_timeout(run_astar_proc, args=(cnf, meta), timeout=TIMEOUT_ASTAR)
-        sat = (ok and model is not None)
-        connected = False
-        if sat:
-            connected = check_connectivity_from_model(model, meta)
-            bridges = model_to_bridges(meta, model)
-            grid = build_output_grid(board, meta, bridges)
-            fname = input_filename.replace("input","output").replace(".txt","-astar.txt")
-            export_output_grid(grid, fname)
-        print(f"   A*: sat={sat}, time={elapsed:.4f}s, timeout={timed_out}, connected={connected}")
-        rows.append({"filename":input_filename, "solver":"astar", "sat":sat, "time":elapsed, "timeout":timed_out, "connected":connected})
+        print("-> Running A* SAT...")
+        ok, result, elapsed, timed_out = run_with_timeout(
+            run_astar_proc, args=(cnf, meta), timeout=TIMEOUT_ASTAR
+        )
 
-    # 3) Backtracking
+        sat = False
+        connected = False
+        node_expanded = None
+
+        if ok and isinstance(result, dict):
+            sat = result["success"]
+            node_expanded = result["node_expanded"]
+            model = result["solution"]
+
+            if sat:
+                connected = check_connectivity_from_model(model, meta)
+                bridges = model_to_bridges(meta, model)
+                grid = build_output_grid(board, meta, bridges)
+                fname = input_filename.replace(
+                    "input", "output"
+                ).replace(".txt", "-astar.txt")
+                export_output_grid(grid, fname)
+
+        rows.append({
+            "filename": input_filename,
+            "solver": "astar",
+            "sat": sat,
+            "time": elapsed,
+            "node_expanded": node_expanded,
+            "timeout": timed_out,
+            "connected": connected,
+        })
+
+    # ---------- A* GRAPH ----------
+    if "astar_graph" in solvers:
+        print("-> Running A* Graph...")
+        ok, result, elapsed, timed_out = run_with_timeout(
+            run_astar_graph_proc, args=(meta,), timeout=TIMEOUT_ASTAR
+        )
+
+        sat = False
+        connected = False
+        node_expanded = None
+
+        if ok and isinstance(result, dict):
+            node_expanded = result.get("node_expanded")
+            solution = result.get("solution")
+            sat = solution is not None
+            connected = (
+                check_connectivity(meta["islands"], solution)
+                if solution else False
+            )
+        else:
+            if isinstance(result, dict):
+                node_expanded = result.get("node_expanded")
+
+        rows.append({
+            "filename": input_filename,
+            "solver": "astar_graph",
+            "sat": sat,
+            "time": elapsed,
+            "node_expanded": node_expanded,
+            "timeout": timed_out,
+            "connected": connected,
+        })
+
+
+    # ---------- Backtracking SAT ----------
     if "backtracking" in solvers:
-        print("-> Running Backtracking...")
-        ok, model, elapsed, timed_out = run_with_timeout(run_backtracking_proc, args=(cnf, meta), timeout=TIMEOUT_BACKTRACK)
-        sat = (ok and model is not None)
-        connected = False
-        if sat:
-            connected = check_connectivity_from_model(model, meta)
-            bridges = model_to_bridges(meta, model)
-            grid = build_output_grid(board, meta, bridges)
-            fname = input_filename.replace("input","output").replace(".txt","-backtracking.txt")
-            export_output_grid(grid, fname)
-        print(f"   Backtracking: sat={sat}, time={elapsed:.4f}s, timeout={timed_out}, connected={connected}")
-        rows.append({"filename":input_filename, "solver":"backtracking", "sat":sat, "time":elapsed, "timeout":timed_out, "connected":connected})
+        print("-> Running Backtracking SAT...")
+        ok, result, elapsed, timed_out = run_with_timeout(
+            run_backtracking_proc, args=(cnf, meta), timeout=TIMEOUT_BACKTRACK
+        )
 
-    # 4) Brute-force
-    if "bruteforce" in solvers:
-        print("-> Running Brute-force...")
-        ok, model, elapsed, timed_out = run_with_timeout(run_bruteforce_proc, args=(cnf, meta), timeout=TIMEOUT_BRUTEFORCE)
-        sat = (ok and model is not None)
+        sat = False
         connected = False
-        if sat:
-            connected = check_connectivity_from_model(model, meta)
-            bridges = model_to_bridges(meta, model)
-            grid = build_output_grid(board, meta, bridges)
-            fname = input_filename.replace("input","output").replace(".txt","-bruteforce.txt")
-            export_output_grid(grid, fname)
-        print(f"   Brute-force: sat={sat}, time={elapsed:.4f}s, timeout={timed_out}, connected={connected}")
-        rows.append({"filename":input_filename, "solver":"bruteforce", "sat":sat, "time":elapsed, "timeout":timed_out, "connected":connected})
+        node_expanded = None
+
+        if ok and isinstance(result, dict):
+            sat = result["success"]
+            node_expanded = result["node_expanded"]
+            model = result["solution"]
+
+            if sat:
+                connected = check_connectivity_from_model(model, meta)
+                bridges = model_to_bridges(meta, model)
+                grid = build_output_grid(board, meta, bridges)
+                fname = input_filename.replace(
+                    "input", "output"
+                ).replace(".txt", "-backtracking.txt")
+                export_output_grid(grid, fname)
+
+        rows.append({
+            "filename": input_filename,
+            "solver": "backtracking",
+            "sat": sat,
+            "time": elapsed,
+            "node_expanded": node_expanded,
+            "timeout": timed_out,
+            "connected": connected,
+        })
+
+    # ---------- Backtracking GRAPH ----------
+    if "backtracking_graph" in solvers:
+        print("-> Running Backtracking Graph...")
+        ok, result, elapsed, timed_out = run_with_timeout(
+            run_backtracking_graph_proc, args=(meta,), timeout=TIMEOUT_BACKTRACK
+        )
+
+        sat = False
+        connected = False
+        node_expanded = None
+        if ok and isinstance(result, dict):
+            node_expanded = result.get("node_expanded")
+            solution = result.get("solution")
+            sat = solution is not None
+            connected = (
+                check_connectivity(meta["islands"], solution)
+                if solution else False
+            )
+        else:
+            if isinstance(result, dict):
+                node_expanded = result.get("node_expanded")
+
+        rows.append({
+            "filename": input_filename,
+            "solver": "backtracking_graph",
+            "sat": sat,
+            "time": elapsed,
+            "node_expanded": node_expanded,
+            "timeout": timed_out,
+            "connected": connected,
+        })
+
+    # ---------- Brute-force SAT ----------
+    if "bruteforce" in solvers:
+        print("-> Running Brute-force SAT...")
+        ok, result, elapsed, timed_out = run_with_timeout(
+            run_bruteforce_proc, args=(cnf, meta), timeout=TIMEOUT_BRUTEFORCE
+        )
+
+        sat = False
+        connected = False
+        node_expanded = None
+
+        if ok and isinstance(result, dict):
+            sat = result["success"]
+            node_expanded = result["node_expanded"]
+            model = result["solution"]
+
+            if sat:
+                connected = check_connectivity_from_model(model, meta)
+                bridges = model_to_bridges(meta, model)
+                grid = build_output_grid(board, meta, bridges)
+                fname = input_filename.replace(
+                    "input", "output"
+                ).replace(".txt", "-bruteforce.txt")
+                export_output_grid(grid, fname)
+
+        rows.append({
+            "filename": input_filename,
+            "solver": "bruteforce",
+            "sat": sat,
+            "time": elapsed,
+            "node_expanded": node_expanded,
+            "timeout": timed_out,
+            "connected": connected,
+        })
 
     return rows
 
-# ----------------- Batch runner -----------------
+
+# ================= BATCH RUNNER =================
 def run_batch(input_list=None, out_csv=CSV_PATH):
     if input_list is None:
         input_list = DEFAULT_INPUTS
@@ -176,17 +340,27 @@ def run_batch(input_list=None, out_csv=CSV_PATH):
         rows = experiment_on_file(fname)
         results.extend(rows)
 
-    header = ["filename","solver","sat","time","timeout","connected"]
+    header = [
+        "filename",
+        "solver",
+        "sat",
+        "time",
+        "node_expanded",
+        "timeout",
+        "connected",
+    ]
+
     with open(out_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=header)
         writer.writeheader()
         for r in results:
             writer.writerow(r)
+
     print(f"\nAll experiments done. Results saved to: {out_csv}")
 
-# ----------------- Main -----------------
+
+# ================= MAIN =================
 if __name__ == "__main__":
-    # Needed for Windows multiprocessing safe spawn
     mp.freeze_support()
 
     if len(sys.argv) == 1:
@@ -200,7 +374,6 @@ if __name__ == "__main__":
         else:
             print("Usage: python main.py [input-file.txt | all]")
     else:
-        # If multiple files provided
         files = [f for f in sys.argv[1:] if f.endswith(".txt")]
         if files:
             run_batch(files)
