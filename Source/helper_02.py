@@ -187,5 +187,7 @@ def main():
     for clause in cnf.clauses:
         print(clause)
 
+
+
 if __name__ == "__main__":
     main()

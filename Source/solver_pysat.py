@@ -129,3 +129,5 @@ def run_pysat(cnf, meta, timeout=1000.0):
 
     elapsed = time.perf_counter() - t0
     return model, elapsed, timed_out, connected
+
+
