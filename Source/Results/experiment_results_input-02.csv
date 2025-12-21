@@ -1,4 +1,0 @@
-filename,solver,sat,time,node_expanded,timeout,connected
-input-02.txt,pysat,True,0.0008269999962067232,,False,True
-input-02.txt,astar,True,0.17002960000536405,1,False,False
-input-02.txt,astar_graph,True,0.18153220000385772,71,False,True

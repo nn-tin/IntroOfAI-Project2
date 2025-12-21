@@ -1,68 +1,94 @@
+# Source/solver_astar.py
+"""
+A* SAT-based Solver for Hashiwokakero
+Includes:
+- node_expanded
+- execution time
+- peak memory usage (tracemalloc)
+"""
+
 import time
 import heapq
 import tracemalloc
 
+
 class AStarSAT:
-    def __init__(self, cnf_clauses, num_vars, timeout=180.0):
-        """
-        cnf_clauses: List[List[int]], mỗi clause là list các literal (ví dụ: [1, -2, 3])
-        num_vars: số biến tối đa, biến đánh số từ 1..num_vars
-        """
-        self.clauses = cnf_clauses
-        self.num_vars = num_vars
+    def __init__(self, cnf, meta, timeout=180.0):
+        self.meta = meta
+        self.cnf = cnf
         self.timeout = timeout
 
-    def is_satisfied(self, assignment):
-        for clause in self.clauses:
-            satisfied = False
-            for lit in clause:
-                var = abs(lit)
-                val = assignment.get(var, None)
-                if val is None:
-                    # biến chưa gán
-                    satisfied = True  # có khả năng thỏa, tiếp tục
-                    break
-                if (lit > 0 and val == True) or (lit < 0 and val == False):
-                    satisfied = True
-                    break
-            if not satisfied:
-                return False
-        return True
+        self.islands = meta["islands"]
 
-    def is_conflict(self, assignment):
-        # Kiểm tra có clause nào chắc chắn không thể thỏa (tất cả literal False)
-        for clause in self.clauses:
-            conflict = True
-            for lit in clause:
-                var = abs(lit)
-                val = assignment.get(var, None)
-                if val is None:
-                    conflict = False
-                    break
-                if (lit > 0 and val == True) or (lit < 0 and val == False):
-                    conflict = False
-                    break
-            if conflict:
-                return True
-        return False
+        # ---------- STATIC HEURISTIC: sort edges ----------
+        self.edges = sorted(
+            meta["edges"],
+            key=lambda e: (self.islands[e["u"]]["val"] + self.islands[e["v"]]["val"]),
+            reverse=True
+        )
 
-    def heuristic(self, assignment):
-        # Đếm số clause chưa chắc chắn thỏa
-        count = 0
-        for clause in self.clauses:
-            satisfied = False
-            for lit in clause:
-                var = abs(lit)
-                val = assignment.get(var, None)
-                if val is None:
-                    satisfied = True
-                    break
-                if (lit > 0 and val == True) or (lit < 0 and val == False):
-                    satisfied = True
-                    break
-            if not satisfied:
-                count += 1
-        return count
+        self.n_edges = len(self.edges)
+        self.var_map = meta["var_map"]
+
+        # ---------- Pre-compute connected edges ----------
+        self.island_connected_edges = {i: [] for i in range(len(self.islands))}
+        for idx, e in enumerate(self.edges):
+            self.island_connected_edges[e["u"]].append(idx)
+            self.island_connected_edges[e["v"]].append(idx)
+
+        # ---------- Pre-compute crossings ----------
+        self.crossing_pairs = self._find_crossing_pairs()
+
+    # ======================================================
+    # Pre-processing
+    # ======================================================
+
+    def _find_crossing_pairs(self):
+        pairs = []
+        for i in range(self.n_edges):
+            for j in range(i + 1, self.n_edges):
+                e1, e2 = self.edges[i], self.edges[j]
+                if e1["type"] != e2["type"]:
+                    h, v = (e1, e2) if e1["type"] == "H" else (e2, e1)
+                    if v["r1"] < h["r"] < v["r2"] and h["c1"] < v["c"] < h["c2"]:
+                        pairs.append((i, j))
+        return pairs
+
+    # ======================================================
+    # Heuristic
+    # ======================================================
+
+    def heuristic(self, idx, current_degrees):
+        """
+        Return estimated remaining cost
+        Return INF if dead-end detected
+        """
+        h_score = 0
+
+        for isl_id, isl in enumerate(self.islands):
+            needed = isl["val"] - current_degrees[isl_id]
+
+            if needed == 0:
+                continue
+            if needed < 0:
+                return float("inf")
+
+            # ---------- Look-ahead pruning ----------
+            potential = 0
+            for edge_idx in self.island_connected_edges[isl_id]:
+                if edge_idx >= idx:
+                    potential += 2
+
+            if needed > potential:
+                return float("inf")
+
+            h_score += needed
+
+        return h_score
+
+    # ======================================================
+    # Solver
+    # ======================================================
 
     def solve(self):
         tracemalloc.start()
@@ -70,14 +96,18 @@ class AStarSAT:
 
         node_expanded = 0
         visited = set()
-        frontier = []
+        pq = []
 
-        start_assign = dict()
-        start_h = self.heuristic(start_assign)
-        g = 0
-        heapq.heappush(frontier, (g + start_h, g, start_assign))
+        start_degs = tuple([0] * len(self.islands))
+        start_assign = tuple([0] * self.n_edges)
+        start_h = self.heuristic(0, start_degs)
 
-        while frontier:
+        heapq.heappush(
+            pq, (start_h, start_h, 0, start_assign, start_degs)
+        )
+
+        while pq:
+            # ---------- Timeout ----------
             if time.perf_counter() - t0 > self.timeout:
                 current, peak = tracemalloc.get_traced_memory()
                 tracemalloc.stop()
@@ -89,45 +119,67 @@ class AStarSAT:
                     "success": False
                 }
 
-            f, g, assignment = heapq.heappop(frontier)
+            f, h, idx, assigns, degs = heapq.heappop(pq)
             node_expanded += 1
 
-            # Tạo key trạng thái để tránh lặp
-            key = tuple(sorted(assignment.items()))
-            if key in visited:
-                continue
-            visited.add(key)
-
-            if self.is_conflict(assignment):
+            if h == float("inf"):
                 continue
 
-            if self.is_satisfied(assignment):
-                current, peak = tracemalloc.get_traced_memory()
-                tracemalloc.stop()
-                return {
-                    "solution": assignment,
-                    "node_expanded": node_expanded,
-                    "time": time.perf_counter() - t0,
-                    "peak_memory": peak,
-                    "success": True
-                }
+            # ---------- Goal ----------
+            if idx == self.n_edges:
+                if h == 0:
+                    model = self._format_model(assigns)
+                    current, peak = tracemalloc.get_traced_memory()
+                    tracemalloc.stop()
+                    return {
+                        "solution": model,
+                        "node_expanded": node_expanded,
+                        "time": time.perf_counter() - t0,
+                        "peak_memory": peak,
+                        "success": True
+                    }
+                continue
 
-            # Chọn biến chưa gán nhỏ nhất
-            for var in range(1, self.num_vars + 1):
-                if var not in assignment:
-                    # Branch True
-                    new_assign_true = assignment.copy()
-                    new_assign_true[var] = True
-                    if not self.is_conflict(new_assign_true):
-                        h_new = self.heuristic(new_assign_true)
-                        heapq.heappush(frontier, (g + 1 + h_new, g + 1, new_assign_true))
-                    # Branch False
-                    new_assign_false = assignment.copy()
-                    new_assign_false[var] = False
-                    if not self.is_conflict(new_assign_false):
-                        h_new = self.heuristic(new_assign_false)
-                        heapq.heappush(frontier, (g + 1 + h_new, g + 1, new_assign_false))
-                    break  # chỉ xét một biến chưa gán một lượt
+            state_key = (idx, degs)
+            if state_key in visited:
+                continue
+            visited.add(state_key)
+
+            edge = self.edges[idx]
+            u, v = edge["u"], edge["v"]
+
+            # ---------- Branching: 0 / 1 / 2 ----------
+            for val in (0, 1, 2):
+                new_du = degs[u] + val
+                new_dv = degs[v] + val
+
+                # Degree pruning
+                if new_du > self.islands[u]["val"] or new_dv > self.islands[v]["val"]:
+                    continue
+
+                # Crossing pruning
+                if val > 0 and self._check_crossing(idx, assigns):
+                    continue
+
+                new_degs = list(degs)
+                new_degs[u] = new_du
+                new_degs[v] = new_dv
+                new_degs = tuple(new_degs)
+
+                new_h = self.heuristic(idx + 1, new_degs)
+                if new_h == float("inf"):
+                    continue
+
+                new_assigns = list(assigns)
+                new_assigns[idx] = val
+
+                g = idx + 1
+                f = g + new_h
+
+                heapq.heappush(
+                    pq,
+                    (f, new_h, idx + 1, tuple(new_assigns), new_degs)
+                )
 
         current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
@@ -139,21 +191,29 @@ class AStarSAT:
             "success": False
         }
 
+    # ======================================================
+    # Helpers
+    # ======================================================
 
-if __name__ == "__main__":
-    # Ví dụ CNF: (x1 or not x2) and (not x1 or x3) and (x2 or not x3)
-    clauses = [
-        [1, -2],
-        [-1, 3],
-        [2, -3]
-    ]
-    num_vars = 3
+    def _check_crossing(self, curr_idx, assigns):
+        for i, j in self.crossing_pairs:
+            other = j if i == curr_idx else i if j == curr_idx else -1
+            if other != -1 and other < curr_idx:
+                if assigns[other] > 0:
+                    return True
+        return False
 
-    solver = AStarSAT(clauses, num_vars)
-    result = solver.solve()
-    if result["success"]:
-        print("Found solution:")
-        for var in range(1, num_vars + 1):
-            print(f"x{var} = {result['solution'].get(var, 'undefined')}")
-    else:
-        print("No solution found.")
+    def _format_model(self, assignments):
+        model = []
+        for idx, val in enumerate(assignments):
+            edge = self.edges[idx]
+            orig_idx = self.meta["edges"].index(edge)
+
+            v1, v2 = self.var_map[orig_idx]
+            if val == 0:
+                model.extend([-v1, -v2])
+            elif val == 1:
+                model.extend([v1, -v2])
+            elif val == 2:
+                model.extend([v1, v2])
+        return model
