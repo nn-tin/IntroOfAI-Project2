@@ -1,0 +1,28 @@
+\section{Giới thiệu}
+
+Hashiwokakero, còn gọi là Bridges hay Hashi, là một trò chơi giải đố logic có nguồn gốc từ Nhật Bản, do nhà xuất bản Nikoli phát triển. Trò chơi được đặt tên theo ý nghĩa “xây cầu” (hashi nghĩa là cầu trong tiếng Nhật) và yêu cầu người chơi nối các đảo trên một bảng lưới hình chữ nhật bằng các cây cầu theo các quy tắc nghiêm ngặt.
+
+Mỗi đảo trên bảng được đánh số từ 1 đến 8, biểu thị số cầu phải được nối với đảo đó. Người chơi cần nối các đảo sao cho:
+
+
+\begin{itemize}
+    \item Các cầu nối phải chạy thẳng theo hàng hoặc cột, không chéo.
+    \item Tối đa có hai cầu nối giữa một cặp đảo.
+    \item Cầu không được chồng lên nhau hoặc đi qua các đảo khác.
+    \item Số cầu nối đến mỗi đảo phải đúng bằng số ghi trên đảo đó.
+    \item Tất cả các đảo phải được kết nối thành một mạng lưới duy nhất, không có đảo nào bị tách rời.
+\end{itemize}
+
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.6\textwidth]{hashiwokakero_example.png}
+    \caption{Ví dụ một bảng Hashiwokakero và các cầu nối giữa các đảo}
+    \label{fig:hashiwokakero_example}
+\end{figure}
+
+Mục tiêu là tìm ra một cách xây cầu hợp lệ, thỏa mãn tất cả các quy tắc trên, đảm bảo tính kết nối toàn bộ các đảo trên bản đồ. Đây là một bài toán kết hợp giữa tính toán tổ hợp và suy luận logic, đòi hỏi thuật toán giải phải kiểm tra nhiều điều kiện phức tạp và tối ưu hóa để tìm ra lời giải nhanh chóng.
+
+Bài toán Hashiwokakero không chỉ là một thử thách trí tuệ mà còn là một bài toán điển hình trong lĩnh vực Trí tuệ nhân tạo và khoa học máy tính, đặc biệt trong việc áp dụng các kỹ thuật giải SAT và thuật toán tìm kiếm thông minh để tự động hóa quá trình giải đố.
+
+Việc chuyển đổi bài toán Hashiwokakero thành dạng SAT dưới CNF giúp tận dụng được sức mạnh của các bộ giải SAT hiện đại, trong khi các thuật toán tìm kiếm như A*, Brute-force, Backtracking hỗ trợ so sánh hiệu năng và mở rộng hiểu biết về giải thuật trong AI.
