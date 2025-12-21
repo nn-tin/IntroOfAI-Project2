@@ -1,0 +1,4 @@
+filename,solver,sat,time,node_expanded,timeout,connected
+input-03.txt,pysat,True,0.0006773999921279028,,False,True
+input-03.txt,astar,True,0.15509070000553038,1,False,False
+input-03.txt,astar_graph,True,0.2237390999944182,273,False,True

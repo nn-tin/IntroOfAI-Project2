@@ -114,9 +114,9 @@ def experiment_on_file(
         "pysat",
         "astar",
         "astar_graph",
-        "backtracking",
-        "backtracking_graph",
-        "bruteforce",
+        # "backtracking",
+        # "backtracking_graph",
+        # "bruteforce",
     ),
 ):
     path = os.path.join(INPUTS_DIR, input_filename)
