@@ -1,0 +1,136 @@
+\section{Phân tích thuật toán giải Hashiwokakero}
+
+% =====================================================
+\subsection{Thiết lập thực nghiệm}
+
+\subsubsection{Dữ liệu đầu vào (Dataset)}
+Thực nghiệm được tiến hành trên bộ dữ liệu gồm 10 tệp tin đầu vào (\texttt{input-01.txt} đến \texttt{input-10.txt}) với kích thước và độ khó tăng dần, nhằm đánh giá khả năng mở rộng và giới hạn thực tế của các thuật toán.
+
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Kích thước} & \textbf{Tên Input} & \textbf{Số đảo} \\
+\hline
+7×7 & Input-01.txt & 15 \\
+    & Input-02.txt & 17 \\
+    & Input-03.txt & 18 \\
+\hline
+9×9 & Input-04.txt & 32 \\
+    & Input-05.txt & 30 \\
+\hline
+13×13 & Input-06.txt & 58 \\
+       & Input-07.txt & 62 \\
+\hline
+17×17 & Input-08.txt & 98 \\
+       & Input-09.txt & 99 \\
+\hline
+20×20 & Input-10.txt & 135 \\
+\hline
+\end{tabular}
+
+\subsubsection{Điều kiện thực hiện}
+\begin{itemize}
+    \item \textbf{Thời gian tối đa (Timeout):} 60 giây cho mỗi lượt chạy.
+    \item \textbf{Mục tiêu:} Tìm lời giải thỏa mãn đồng thời:
+    \begin{enumerate}
+        \item Tổng bậc của mỗi đảo đúng bằng giá trị yêu cầu.
+        \item Đồ thị cầu thu được là một thành phần liên thông duy nhất.
+    \end{enumerate}
+    \item \textbf{Các thuật toán so sánh:} PySAT (Glucose3), A*, A* Graph, Backtracking SAT, Backtracking Graph và Brute-force.
+\end{itemize}
+
+% =====================================================
+\subsection{Đồ thị 1: Thời gian giải theo số lượng đảo}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth]{../image/solvetime_island.png}
+    \caption{Thời gian giải theo số lượng đảo}
+    \label{fig:solve-time-island}
+\end{figure}
+
+Đồ thị sử dụng thang đo logarit cho phép quan sát rõ sự chênh lệch hiệu năng rất lớn giữa các thuật toán.
+
+\paragraph{Phân tích kết quả}
+\begin{itemize}
+    \item \textbf{Sự thống trị của PySAT:} Như thể hiện trong Hình~\ref{fig:solve-time-island}, PySAT có thời gian giải thấp nhất và gần như không tăng, dao động trong khoảng $10^{-3}$ đến $10^{-2}$ giây, ngay cả khi số lượng đảo lên tới gần 140. Điều này cho thấy sức mạnh vượt trội của bộ giải SAT dựa trên cơ chế CDCL (Glucose3). Không có trường hợp nào PySAT bị timeout trong toàn bộ tập dữ liệu.
+    
+    \item \textbf{Hiệu quả của heuristic:} A* và phiên bản \texttt{astar\_graph} có hiệu năng tương đối tương đồng trên các bài toán nhỏ. Tuy nhiên, khi số lượng đảo vượt quá 60, cả hai đều không còn giải được trong thời gian cho phép. Phiên bản \texttt{astar\_graph} cho thấy hiệu năng tốt hơn backtracking trong một số bài toán cỡ trung bình.
+    
+    \item \textbf{Ngưỡng timeout (60 giây):} Các thuật toán bruteforce, backtracking\_graph, backtracking và astar đều có xu hướng chạm tới ngưỡng timeout 60 giây khi kích thước bài toán tăng. Bruteforce và Backtracking Graph chỉ giải được Input 01. Từ Input 02 trở đi, cả hai đều rơi vào trạng thái timeout.
+\end{itemize}
+
+% =====================================================
+\subsection{Đồ thị 2: Thời gian giải theo từng file input}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth]{../image/solvetime_input.png}
+    \caption{Thời gian giải theo từng file input}
+    \label{fig:solve-time-input}
+\end{figure}
+
+\paragraph{Đặc điểm hệ trục}
+\begin{itemize}
+    \item Trục hoành (X): Các file input từ \texttt{input-01.txt} đến \texttt{input-10.txt}, tương ứng với độ khó tăng dần.
+    \item Trục tung (Y): Thời gian thực thi (giây), sử dụng thang đo tuyến tính.
+\end{itemize}
+
+\paragraph{Phân tích kết quả}
+\begin{itemize}
+    \item \textbf{Bruteforce thất bại sớm:} Như trong Hình~\ref{fig:solve-time-input}, thuật toán bruteforce đạt ngưỡng timeout khoảng 60 giây ngay từ \texttt{input-02.txt}, cho thấy phương pháp duyệt cạn không phù hợp với bài toán Hashiwokakero.
+    
+    \item \textbf{Sự phân hóa ở các bài toán trung bình:} Trong các file từ \texttt{input-04.txt} đến \texttt{input-06.txt}, thời gian chạy của backtracking và A* tăng mạnh. Tại \texttt{input-06.txt}, A* mất khoảng 15 giây trong khi backtracking đã chạm ngưỡng timeout. 
+    
+    \item \textbf{PySAT duy trì độ ổn định:} PySAT có thời gian chạy gần như bằng 0 trên toàn bộ các file input, thể hiện hiệu năng vượt trội và khả năng mở rộng rất tốt. Ngay cả tại Input 10 (135 đảo, lưới 20x20), PySAT chỉ mất khoảng 0.020 giây để tìm lời giải.
+    
+    \item \textbf{Vấn đề liên thông với A*:} Ở Input 06 và Input 07, A* tìm được nghiệm thỏa mãn các ràng buộc SAT (sat=True) nhưng không đảm bảo tính liên thông (connected=False). Điều này cho thấy A* dừng tại nghiệm đầu tiên hợp lệ về bậc đảo mà chưa có cơ chế quay lui hoặc bổ sung ràng buộc liên thông.
+\end{itemize}
+
+% =====================================================
+\subsection{Đồ thị 3: Số nút mở rộng theo số lượng đảo}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth]{../image/searchspace.png}
+    \caption{Số lượng nút đã mở rộng theo số lượng đảo (thang logarit)}
+    \label{fig:search-space}
+\end{figure}
+
+\paragraph{Đặc điểm hệ trục}
+\begin{itemize}
+    \item Trục hoành (X): Số lượng đảo.
+    \item Trục tung (Y): Số lượng nút đã mở rộng (Nodes Expanded), sử dụng thang đo logarit.
+\end{itemize}
+
+\paragraph{Phân tích kết quả}
+\begin{itemize}
+    \item \textbf{Bùng nổ tổ hợp:} Hình~\ref{fig:search-space} cho thấy bruteforce và backtracking\_graph mở rộng hơn $10^{6}$ nút chỉ với số lượng đảo nhỏ (dưới 20), minh họa rõ ràng hiện tượng bùng nổ tổ hợp. Ngay tại Input 01 (15 đảo), Brute-force phải mở rộng tới 1.872.632 nút, trong khi Backtracking Graph mở tới 2.531.408 nút.
+    
+    \item \textbf{Thu hẹp không gian tìm kiếm:} A* và \texttt{astar\_graph} chỉ mở rộng từ $10^{1}$ đến $10^{3}$ nút, thấp hơn hàng nghìn lần so với các phương pháp duyệt truyền thống. Ví dụ, tại Input 04, A* chỉ mở rộng khoảng 80 nút, trong khi Backtracking mở tới 2437 nút.
+    
+    \item \textbf{Vai trò của heuristic:} Hàm heuristic $h(n)$ đóng vai trò then chốt trong việc dẫn hướng tìm kiếm, giúp giảm mạnh số nhánh sai và số nút cần mở rộng.
+    
+    \item \textbf{So sánh Backtracking SAT và Graph:} Backtracking SAT giải được đến Input 05 (tại Input 04 mất khoảng 40 giây), trong khi Backtracking Graph thất bại ngay từ Input 02. Kết quả này cho thấy việc đưa bài toán về dạng SAT mang lại hiệu quả vượt trội nhờ cơ chế lan truyền đơn vị (unit propagation), giúp loại bỏ các nhánh sai ngay từ sớm.
+\end{itemize}
+
+% =====================================================
+\subsection{Tổng kết và đánh giá}
+
+\subsubsection{Thứ hạng hiệu năng}
+\begin{itemize}
+    \item \textbf{PySAT:} Xuất sắc – giải quyết mọi bài toán với thời gian cực ngắn.
+    \item \textbf{A* (SAT-based):} Khá – hiệu quả đến quy mô khoảng 60 đảo nhờ heuristic.
+    \item \textbf{A* Graph:} Trung bình – tốt hơn backtracking nhưng kém hơn A* SAT.
+    \item \textbf{Backtracking SAT:} Trung bình yếu – chỉ phù hợp với bài toán nhỏ.
+    \item \textbf{Backtracking Graph / Brute-force:} Kém – không có giá trị thực tế.
+\end{itemize}
+
+\subsubsection{Kết luận}
+\begin{itemize}
+    \item \textbf{Sức mạnh của SAT:} Hashiwokakero là bài toán rất phù hợp với SAT, đặc biệt khi kết hợp cơ chế blocking clauses và học mâu thuẫn. Nhờ bộ máy CDCL (Conflict-Driven Clause Learning), PySAT có khả năng loại bỏ hàng triệu trạng thái không khả thi thông qua việc học từ các mâu thuẫn cục bộ, giúp không gian tìm kiếm bị thu hẹp mạnh mẽ.
+    
+    \item \textbf{Vai trò của heuristic:} Heuristic giúp giảm số nút mở rộng hàng nghìn lần, nhưng vẫn không đủ để vượt qua sự bùng nổ tổ hợp khi số đảo vượt quá 100.
+    
+    \item \textbf{Tính liên thông:} Đây là ràng buộc khó nhất. Các thuật toán tìm kiếm như A* cần cơ chế \textit{lazy constraints} tương tự PySAT để đảm bảo lời giải hoàn chỉnh.
+    
+    \item \textbf{Giới hạn thực tế:} Đối với các bài toán Hashiwokakero có kích thước lớn, các phương pháp duyệt cạn và backtracking thuần túy gần như không khả thi trong thực tế.
+\end{itemize}

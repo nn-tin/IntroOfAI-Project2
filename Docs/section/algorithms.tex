@@ -1,0 +1,112 @@
+\section{Chi tiết thuật toán}
+\subsection{Nhóm Thuật toán dựa trên SAT (SAT-based)}
+
+% ------------------------------------------------------
+\subsubsection{Brute-force SAT (\texttt{solver\_bruteforce.py})}
+
+\textbf{Quy trình triển khai:}
+\begin{itemize}
+    \item \textbf{Khởi tạo:} Tiền tính toán toàn bộ các cặp cạnh có khả năng cắt nhau (\textit{crossing pairs}) nhằm tối ưu hoá việc kiểm tra hình học trong quá trình tìm kiếm.
+    
+    \item \textbf{Duyệt DFS:} Thuật toán duyệt theo chiều sâu qua danh sách các cạnh tiềm năng. Với mỗi cạnh, thử gán số cầu:
+    \[
+        v \in \{0, 1, 2\}
+    \]
+    
+    \item \textbf{Cơ chế cắt tỉa (Pruning):}
+    \begin{enumerate}
+        \item \textit{Xung đột hình học:} Nếu $v > 0$, kiểm tra xem cạnh hiện tại có cắt bất kỳ cạnh nào đã được gán trước đó hay không.
+        \item \textit{Tràn bậc đảo:} Nếu tổng số cầu tại một đảo vượt quá giá trị yêu cầu (\texttt{value}), nhánh tìm kiếm bị loại bỏ ngay lập tức.
+    \end{enumerate}
+    
+    \item \textbf{Kiểm tra cuối cùng:} Tại nút lá, thuật toán xác minh rằng tổng bậc của \textbf{mọi đảo} đều bằng đúng giá trị yêu cầu.
+\end{itemize}
+
+% ------------------------------------------------------
+\subsubsection{Backtracking SAT (\texttt{solver\_backtracking.py})}
+
+\textbf{Quy trình triển khai:}
+\begin{itemize}
+    \item \textbf{Khung thuật toán:} Áp dụng thuật toán DPLL (Davis–Putnam–Logemann–Loveland) trên tập mệnh đề CNF.
+    
+    \item \textbf{Lan truyền đơn vị (Unit Propagation):} 
+    Trong mỗi bước đệ quy, hàm \texttt{\_unit\_propagate} quét toàn bộ CNF. Nếu một mệnh đề chỉ còn duy nhất một biến chưa được gán, biến đó sẽ bị ép giá trị bắt buộc. Quá trình này được lặp lại cho đến khi không còn ép buộc mới hoặc phát sinh mâu thuẫn.
+    
+    \item \textbf{Heuristic chọn biến:} 
+    Sử dụng chiến lược chọn biến xuất hiện với tần suất cao nhất trong các mệnh đề chưa được thỏa mãn (\textit{frequency-based branching}).
+\end{itemize}
+
+% ------------------------------------------------------
+\subsubsection{A* SAT (\texttt{solver\_astar.py})}
+
+\textbf{Quy trình triển khai:}
+\begin{itemize}
+    \item \textbf{Trạng thái:} Mỗi trạng thái là một bộ gán biến SAT từng phần (\textit{partial assignment}), được lưu trữ dưới dạng \texttt{frozenset} để có thể sử dụng trong tập \texttt{visited}.
+    
+    \item \textbf{Hàm đánh giá:}
+    \[
+        f(n) = g(n) + h(n)
+    \]
+    với:
+    \begin{itemize}
+        \item $g(n)$: số lượng biến SAT đã được gán (chi phí đường đi).
+        \item $h(n)$: heuristic ước lượng số bước còn lại:
+        \[
+            h(n) = n_{\text{vars}} - \lvert \text{assignment} \rvert
+        \]
+    \end{itemize}
+    
+\end{itemize}
+
+% ------------------------------------------------------
+\subsubsection{PySAT -- Glucose3 (\texttt{solver\_pysat.py})}
+
+\textbf{Quy trình triển khai:}
+\begin{itemize}
+    \item \textbf{Chiến lược Lazy Constraint:} 
+    Tính liên thông không được mã hóa trực tiếp vào CNF mà được xử lý thông qua vòng lặp hậu kiểm.
+    
+    \item \textbf{Vòng lặp giải:}
+    \begin{enumerate}
+        \item Solver Glucose3 tìm một mô hình (\textit{model}) thỏa mãn toàn bộ CNF.
+        \item Chuyển model thành cấu hình cầu và kiểm tra liên thông bằng BFS.
+        \item Nếu liên thông: trả về nghiệm.
+        \item Nếu không liên thông: thêm một \textit{blocking clause} (phủ định của model hiện tại) và tiếp tục giải.
+    \end{enumerate}
+\end{itemize}
+
+% ======================================================
+\subsection{Nhóm Thuật toán dựa trên Đồ thị (Graph-based)}
+
+% ------------------------------------------------------
+\subsubsection{Backtracking Graph (\texttt{solver\_backtracking\_graph.py})}
+
+\textbf{Quy trình triển khai:}
+\begin{itemize}
+    \item \textbf{Thao tác trực tiếp:} Thuật toán làm việc trực tiếp trên cấu trúc \texttt{islands} và \texttt{edges}, không thông qua biến SAT.
+    
+    \item \textbf{Duyệt đệ quy:} Với mỗi cạnh, thử ba trường hợp: không có cầu, một cầu hoặc hai cầu.
+    
+    \item \textbf{Cắt tỉa:} Nếu tại bất kỳ thời điểm nào bậc của một đảo vượt quá giá trị yêu cầu, nhánh tìm kiếm bị loại bỏ. Kiểm tra liên thông chỉ được thực hiện một lần duy nhất khi tất cả các đảo đạt đúng bậc.
+\end{itemize}
+
+% ------------------------------------------------------
+\subsubsection{A* Graph Search (\texttt{solver\_astar\_graph.py})}
+
+\textbf{Quy trình triển khai:}
+\begin{itemize}
+    \item \textbf{Sinh trạng thái kế tiếp:} 
+    Ưu tiên chọn các đảo chưa đủ bậc và chỉ thử thêm cầu trên các cạnh nối với đảo đó nhằm giảm \textit{branching factor}.
+    
+    \item \textbf{Hàm Heuristic:}
+    \[
+        h(n) = \frac{1}{2} \sum_{i=1}^{N} (val_i - deg_i) + \max(0, C - 1)
+    \]
+    trong đó:
+    \begin{itemize}
+        \item Thành phần thứ nhất biểu diễn số cầu còn thiếu.
+        \item Thành phần thứ hai biểu diễn số thành phần liên thông chưa được kết nối.
+    \end{itemize}
+    
+    \item \textbf{Trạng thái:} Danh sách cầu được chuẩn hóa thành dạng tuple để có thể sử dụng trong tập \texttt{visited}.
+\end{itemize}
