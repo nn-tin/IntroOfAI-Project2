@@ -4,78 +4,117 @@ Phần này mô tả các phương pháp nhóm em đã sử dụng để giải 
 
 \subsection{PySAT}
 
-PySAT là một thư viện Python cung cấp giao diện đơn giản để tương tác với nhiều bộ giải SAT hiệu quả, trong đó có Glucose3 — một solver SAT hiện đại dựa trên thuật toán Conflict-Driven Clause Learning (CDCL), nổi bật về tốc độ và khả năng xử lý các công thức CNF phức tạp.
+PySAT là một thư viện Python cung cấp giao diện đơn giản để tương tác với nhiều bộ giải SAT hiệu quả, trong đó có Glucose3 \cite{pysat-doc}— một solver SAT hiện đại dựa trên thuật toán Conflict-Driven Clause Learning (CDCL), nổi bật về tốc độ và khả năng xử lý các công thức CNF phức tạp.
 
 Trong đồ án này, nhóm em đã sử dụng PySAT với solver Glucose3 để giải các công thức CNF biểu diễn các ràng buộc của bài toán Hashiwokakero.
 
 \subsection{Thuật toán A* SAT cho bài toán Hashiwokakero}
 
-Thuật toán sử dụng phương pháp tìm kiếm theo A* trên không gian trạng thái các gán giá trị cho các cạnh trong biểu diễn CNF của bài toán Hashiwokakero.
+Thuật toán A* SAT giải bài toán Hashiwokakero bằng cách áp dụng tìm kiếm A* trên không gian các gán giá trị từng phần cho các biến SAT trong công thức CNF được xây dựng từ bài toán. 
+Mỗi trạng thái trong quá trình tìm kiếm tương ứng với một \textit{partial assignment} của các biến Boolean, và việc mở rộng trạng thái được dẫn hướng bởi hàm heuristic admissible.
 
 \paragraph{Mô tả thuật toán}
 
 \begin{itemize}
-    \item \textbf{Trạng thái} trong tìm kiếm được biểu diễn bằng:
+    \item \textbf{Trạng thái}:  
+    Mỗi trạng thái được biểu diễn bởi một tập gán biến SAT từng phần \texttt{assignment}, ánh xạ từ chỉ số biến sang giá trị Boolean. 
+    Trạng thái được chuẩn hóa dưới dạng \texttt{frozenset} để có thể lưu và kiểm tra trong tập \texttt{visited}.
+
+    \item \textbf{Lan truyền đơn vị (Unit Propagation)}:  
+    Trước khi mở rộng một trạng thái, thuật toán thực hiện lan truyền đơn vị trên toàn bộ tập mệnh đề CNF. 
+    Nếu một mệnh đề chỉ còn duy nhất một literal chưa được gán, literal đó sẽ bị ép giá trị bắt buộc. 
+    Nếu xuất hiện mệnh đề mà tất cả các literal đều bị gán sai, trạng thái hiện tại bị loại bỏ do mâu thuẫn.
+
+    \item \textbf{Hàm heuristic}:  
+    Heuristic được sử dụng để ước lượng chi phí còn lại như sau:
+    \[
+        h(n) = n_{\text{vars}} - |\texttt{assignment}|
+    \]
+    trong đó \( n_{\text{vars}} \) là tổng số biến SAT và \( |\texttt{assignment}| \) là số biến đã được gán. 
+    Heuristic này ước lượng số bước còn lại cần thiết để hoàn tất phép gán và đảm bảo tính admissible.
+
+    \item \textbf{Hàm đánh giá}:  
+    Thuật toán A* sử dụng hàm:
+    \[
+        f(n) = g(n) + h(n)
+    \]
+    với:
     \begin{itemize}
-        \item Chỉ số cạnh đang xét (idx)
-        \item Mảng gán số cầu (0, 1 hoặc 2) cho các cạnh đã duyệt (assignments)
-        \item Mảng số cầu hiện tại nối đến mỗi đảo (degrees)
+        \item \( g(n) \): số biến đã được gán (chi phí đã đi)
+        \item \( h(n) \): số biến chưa được gán (chi phí ước lượng còn lại)
     \end{itemize}
-    \item \textbf{Hàm heuristic} ước lượng chi phí còn lại là tổng số cầu còn thiếu ở các đảo, kết hợp với cắt tỉa look-ahead nếu tổng tiềm năng cầu trên các cạnh chưa xét không đủ đáp ứng.
-    \item Thuật toán ưu tiên mở rộng trạng thái có giá trị \( f = g + h \) nhỏ nhất, trong đó \( g \) là số cạnh đã xét, \( h \) là heuristic.
-    \item Trong quá trình mở rộng, thuật toán thử gán số cầu (0, 1, 2) cho cạnh hiện tại, kết hợp cắt tỉa khi vượt quá số cầu tối đa của đảo hoặc khi tạo cầu chồng (crossing).
-    \item Thuật toán sử dụng bộ nhớ để lưu trạng thái đã duyệt nhằm tránh lặp lại.
-    \item Thuật toán giới hạn thời gian thực thi để tránh chạy quá lâu.
+
+    \item \textbf{Chiến lược mở rộng}:  
+    Tại mỗi trạng thái, thuật toán chọn biến SAT chưa được gán có chỉ số nhỏ nhất và lần lượt thử gán giá trị \texttt{True} và \texttt{False}. 
+    Các trạng thái con được đưa vào hàng đợi ưu tiên dựa trên giá trị \( f \).
+
+    \item \textbf{Tránh lặp trạng thái}:  
+    Các trạng thái đã được duyệt được lưu trong tập \texttt{visited} để tránh mở rộng lại các cấu hình gán trùng lặp.
+
+    \item \textbf{Điều kiện dừng}:  
+    Khi tất cả các biến đã được gán và mô hình hiện tại thỏa mãn toàn bộ các mệnh đề CNF, thuật toán kết thúc và trả về nghiệm. 
+    Thuật toán cũng dừng khi vượt quá thời gian giới hạn \texttt{timeout}.
 \end{itemize}
 
-\paragraph{Ưu điểm heuristic}
+\paragraph{Ưu điểm của heuristic}
 
 \begin{itemize}
-    \item Heuristic đảm bảo tính admissible (không đánh giá quá cao chi phí còn lại), giúp A* tìm kiếm hiệu quả.
-    \item Cắt tỉa look-ahead giúp phát hiện sớm các nhánh vô vọng, giảm đáng kể số node cần duyệt.
-    \item Kiểm tra crossing loại bỏ các trạng thái không hợp lệ về mặt hình học của cầu.
+    \item Heuristic đơn giản và admissible, không đánh giá quá cao chi phí còn lại.
+    \item Phù hợp với không gian tìm kiếm SAT, nơi mỗi bước tương ứng với việc gán thêm một biến.
+    \item Khi kết hợp với lan truyền đơn vị, heuristic giúp phát hiện sớm các nhánh mâu thuẫn, từ đó giảm đáng kể số node cần mở rộng.
 \end{itemize}
 
 \begin{algorithm}[H]
 \caption{A* SAT Solver cho bài toán Hashiwokakero}
-\KwIn{Danh sách cạnh \texttt{edges}, thông tin đảo \texttt{islands}, ánh xạ biến \texttt{var\_map}, thời gian timeout \(T\)}
+\KwIn{Công thức CNF với \(n\) biến SAT, thời gian giới hạn \(T\)}
 \KwOut{Mô hình gán biến thỏa CNF hoặc báo thất bại}
 
-Khởi tạo trạng thái bắt đầu: chưa gán cầu, số cầu mỗi đảo là 0 \\
-Tính heuristic trạng thái bắt đầu \\
+Khởi tạo \texttt{assignment} rỗng \\
+Tính \( h_0 = n - |\texttt{assignment}| \) \\
 Khởi tạo hàng đợi ưu tiên \texttt{pq} theo giá trị \( f = g + h \) \\
-Khởi tạo bộ nhớ lưu trạng thái đã duyệt \texttt{visited} \\
+Khởi tạo tập trạng thái đã duyệt \texttt{visited} \\
 Bắt đầu đếm thời gian \\
 
 \While{\texttt{pq} không rỗng}{
-    Lấy trạng thái có \(f\) nhỏ nhất: \((f, h, idx, assignments, degrees)\) \\
-    Nếu thời gian vượt quá \(T\), trả về thất bại do timeout \\
-    Nếu \(idx\) bằng số cạnh, kiểm tra heuristic:
-    \begin{itemize}
-        \item Nếu \(h = 0\) (thỏa), trả về nghiệm
-        \item Ngược lại, bỏ qua trạng thái này
-    \end{itemize}
-    Nếu trạng thái đã duyệt, bỏ qua \\
-    Đánh dấu trạng thái hiện tại đã duyệt \\
-    Thử gán số cầu 0, 1, 2 cho cạnh \(idx\), với các điều kiện:
-    \begin{itemize}
-        \item Không vượt quá số cầu tối đa tại đảo liên quan
-        \item Không tạo crossing với cầu đã gán
-        \item Tính lại heuristic trạng thái mới, bỏ qua nếu dead-end
-    \end{itemize}
-    Đưa trạng thái mới vào hàng đợi \texttt{pq}
+    Lấy trạng thái có \( f \) nhỏ nhất từ \texttt{pq} \\
+    \If{thời gian vượt quá \( T \)}{
+        Trả về thất bại
+    }
+
+    Áp dụng lan truyền đơn vị \\
+    \If{phát sinh mâu thuẫn}{
+        Bỏ qua trạng thái
+    }
+
+    \If{trạng thái đã tồn tại trong \texttt{visited}}{
+        Bỏ qua trạng thái
+    }
+    Đánh dấu trạng thái hiện tại là đã duyệt \\
+
+    \If{tất cả biến đã được gán}{
+        \If{mô hình thỏa mãn CNF}{
+            Trả về nghiệm
+        }
+    }
+
+    Chọn biến SAT chưa được gán \\
+    \ForEach{giá trị \( \in \{\texttt{True}, \texttt{False}\} \)}{
+        Gán giá trị cho biến \\
+        Tính lại \( g, h, f \) \\
+        Đưa trạng thái mới vào \texttt{pq}
+    }
 }
-Trả về thất bại do không tìm được nghiệm hợp lệ
+Trả về thất bại do không tìm được nghiệm
 \end{algorithm}
 
 \paragraph{Thông số đánh giá}
 
-Thuật toán theo dõi:
+Thuật toán theo dõi các chỉ số sau:
 \begin{itemize}
-    \item Số node đã mở rộng (node\_expanded)
-    \item Thời gian chạy
-    \item Mức sử dụng bộ nhớ đỉnh (theo dõi với \texttt{tracemalloc})
-    \item Kết quả giải (thành công hoặc thất bại)
+    \item Số node đã mở rộng (\texttt{node\_expanded})
+    \item Thời gian thực thi
+    \item Mức sử dụng bộ nhớ đỉnh (đo bằng \texttt{tracemalloc})
+    \item Trạng thái giải: thành công hoặc thất bại
 \end{itemize}
 
 \subsection{Các thuật toán bổ sung để so sánh}
@@ -91,4 +130,4 @@ Thuật toán theo dõi:
 
 Nhờ có các thuật toán bổ sung này, nhóm có thể đánh giá toàn diện hiệu quả của A* về mặt thời gian xử lý, bộ nhớ sử dụng và khả năng mở rộng, từ đó lựa chọn thuật toán phù hợp nhất cho các trường hợp cụ thể trong bài toán Hashiwokakero.
 
-Các thuật toán này giúp so sánh hiệu năng về tốc độ và bộ nhớ sử dụng
+Các thuật toán này giúp so sánh hiệu năng về tốc độ và bộ nhớ sử dụng.

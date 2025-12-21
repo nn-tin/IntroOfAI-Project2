@@ -1,1 +1,29 @@
 \section{Kết luận}
+
+Trong đồ án này, nhóm đã nghiên cứu và triển khai thành công nhiều phương pháp giải bài toán Hashiwokakero – một bài toán logic tổ hợp tiêu biểu – dưới góc nhìn của Trí tuệ nhân tạo và bài toán thỏa mãn mệnh đề (SAT). 
+Bài toán được mô hình hóa chặt chẽ dưới dạng công thức CNF, bao quát đầy đủ các ràng buộc hình học, ràng buộc bậc đảo và đặc biệt là ràng buộc liên thông toàn cục, vốn được xem là thách thức lớn nhất của Hashiwokakero.
+
+Nhóm đã hiện thực hóa và so sánh một cách có hệ thống hai hướng tiếp cận chính: \textit{SAT-based} và \textit{Graph-based}, bao gồm các thuật toán Brute-force, Backtracking, A* và đặc biệt là PySAT với solver Glucose3. 
+Các thuật toán được triển khai độc lập và được đo lường đầy đủ các chỉ số đánh giá quan trọng như thời gian thực thi, số nút mở rộng và mức sử dụng bộ nhớ, từ đó cho phép đánh giá toàn diện hiệu năng và khả năng mở rộng của từng phương pháp.
+
+Kết quả thực nghiệm cho thấy PySAT (Glucose3) vượt trội hoàn toàn so với các phương pháp còn lại. 
+Nhờ cơ chế \textit{Conflict-Driven Clause Learning (CDCL)} và khả năng lan truyền ràng buộc mạnh mẽ, PySAT giải được toàn bộ các bộ test, kể cả các bài toán lớn với hơn 130 đảo, trong thời gian rất ngắn (chỉ vài phần nghìn giây). 
+Điều này khẳng định sức mạnh của các bộ giải SAT hiện đại khi bài toán được mô hình hóa đúng cách.
+
+Thuật toán A* SAT do nhóm tự xây dựng cho thấy hiệu quả rõ rệt so với brute-force và backtracking truyền thống. 
+Việc sử dụng heuristic admissible kết hợp với lan truyền đơn vị giúp giảm số lượng nút mở rộng hàng nghìn lần, cho phép giải được các bài toán cỡ nhỏ và trung bình. 
+Tuy nhiên, khi kích thước bài toán tăng lớn, A* SAT vẫn không tránh khỏi hiện tượng bùng nổ tổ hợp, đặc biệt khi ràng buộc liên thông chưa được tích hợp linh hoạt như trong các solver SAT hiện đại.
+
+Các thuật toán Graph-based, mặc dù trực quan và dễ hiểu, cho thấy hạn chế rõ rệt về khả năng mở rộng. 
+Ngay cả khi kết hợp heuristic và chiến lược A*, các phương pháp này vẫn kém hiệu quả hơn đáng kể so với các phương pháp SAT-based, đặc biệt trong việc xử lý ràng buộc liên thông và cắt tỉa không gian tìm kiếm.
+
+Từ các kết quả đạt được, đồ án rút ra một số kết luận quan trọng:
+\begin{itemize}
+    \item Hashiwokakero là bài toán rất phù hợp để giải bằng SAT, đặc biệt khi sử dụng các solver hiện đại dựa trên CDCL.
+    \item Heuristic đóng vai trò quan trọng trong việc giảm số nút mở rộng, nhưng không thể thay thế hoàn toàn sức mạnh của học mâu thuẫn và lan truyền ràng buộc.
+    \item Ràng buộc liên thông là yếu tố then chốt quyết định hiệu năng; các chiến lược xử lý ràng buộc linh hoạt (lazy constraints) tỏ ra hiệu quả hơn so với việc dừng sớm tại nghiệm cục bộ.
+    \item Các phương pháp duyệt cạn và backtracking thuần túy hầu như không có giá trị thực tiễn đối với các bài toán Hashiwokakero có kích thước lớn.
+\end{itemize}
+
+Nhìn chung, đồ án đã hoàn thành đầy đủ các yêu cầu đặt ra: mô hình hóa chính xác bài toán, triển khai đa dạng thuật toán, thực nghiệm trên nhiều bộ dữ liệu với quy mô tăng dần và phân tích kết quả một cách chi tiết, có chiều sâu. 
+Kết quả của đồ án không chỉ giúp hiểu rõ hơn về bài toán Hashiwokakero mà còn minh họa rõ ràng sức mạnh của SAT và các kỹ thuật tìm kiếm thông minh trong Trí tuệ nhân tạo hiện đại.
