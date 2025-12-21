@@ -156,23 +156,22 @@ def experiment_on_file(
             "connected": connected,
         })
 
-    # ---------- A* SAT ----------
+   # ---------- A* SAT ----------
     if "astar" in solvers:
         print("-> Running A* SAT...")
         ok, result, elapsed, timed_out = run_with_timeout(
             run_astar_proc, args=(cnf, meta), timeout=TIMEOUT_ASTAR
         )
-
         sat = False
         connected = False
         node_expanded = None
 
         if ok and isinstance(result, dict):
-            sat = result["success"]
-            node_expanded = result["node_expanded"]
-            model = result["solution"]
+            sat = result.get("success", False)
+            node_expanded = result.get("node_expanded", None)
+            model = result.get("solution", None)
 
-            if sat:
+            if sat and model is not None:
                 connected = check_connectivity_from_model(model, meta)
                 bridges = model_to_bridges(meta, model)
                 grid = build_output_grid(board, meta, bridges)
@@ -190,6 +189,7 @@ def experiment_on_file(
             "timeout": timed_out,
             "connected": connected,
         })
+
     def convert_solution_to_bridges(solution, meta):
         bridges = []
         islands = meta["islands"]
