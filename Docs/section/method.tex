@@ -1,88 +1,81 @@
 \section{Các phương pháp giải bài toán}
 
-Phần này mô tả các phương pháp nhóm em đã sử dụng để giải bài toán thỏa mãn mệnh đề (SAT) ở trên sau khi đã chuyển bài toán Hashiwokakero về dạng mệnh đề SAT dưới dạng CNF .
+Phần này mô tả các phương pháp nhóm em đã sử dụng để giải bài toán thỏa mãn mệnh đề (SAT) sau khi đã chuyển bài toán Hashiwokakero về dạng mệnh đề SAT dưới dạng CNF.
 
 \subsection{PySAT}
 
 PySAT là một thư viện Python cung cấp giao diện đơn giản để tương tác với nhiều bộ giải SAT hiệu quả, trong đó có Glucose3 — một solver SAT hiện đại dựa trên thuật toán Conflict-Driven Clause Learning (CDCL), nổi bật về tốc độ và khả năng xử lý các công thức CNF phức tạp.
 
-Trong đồ án này, chúng em đã sử dụng PySAT với solver Glucose3 để giải các công thức CNF biểu diễn các ràng buộc của bài toán Hashiwokakero. 
+Trong đồ án này, nhóm em đã sử dụng PySAT với solver Glucose3 để giải các công thức CNF biểu diễn các ràng buộc của bài toán Hashiwokakero.
 
-\subsection{Thuật toán A* giải SAT cho bài toán Hashiwokakero}
+\subsection{Thuật toán A* SAT cho bài toán Hashiwokakero}
 
-Thuật toán sử dụng phương pháp tìm kiếm theo A* trên không gian trạng thái các gán biến cho công thức CNF biểu diễn bài toán Hashiwokakero.
+Thuật toán sử dụng phương pháp tìm kiếm theo A* trên không gian trạng thái các gán giá trị cho các cạnh trong biểu diễn CNF của bài toán Hashiwokakero.
 
-\paragraph{Input:}
+\paragraph{Mô tả thuật toán}
+
 \begin{itemize}
-    \item Công thức CNF dưới dạng danh sách các clause, mỗi clause là danh sách literal (biến hoặc phủ định biến).
-    \item Số biến tối đa trong công thức.
-    \item Thời gian timeout để tránh chạy quá lâu.
+    \item \textbf{Trạng thái} trong tìm kiếm được biểu diễn bằng:
+    \begin{itemize}
+        \item Chỉ số cạnh đang xét (idx)
+        \item Mảng gán số cầu (0, 1 hoặc 2) cho các cạnh đã duyệt (assignments)
+        \item Mảng số cầu hiện tại nối đến mỗi đảo (degrees)
+    \end{itemize}
+    \item \textbf{Hàm heuristic} ước lượng chi phí còn lại là tổng số cầu còn thiếu ở các đảo, kết hợp với cắt tỉa look-ahead nếu tổng tiềm năng cầu trên các cạnh chưa xét không đủ đáp ứng.
+    \item Thuật toán ưu tiên mở rộng trạng thái có giá trị \( f = g + h \) nhỏ nhất, trong đó \( g \) là số cạnh đã xét, \( h \) là heuristic.
+    \item Trong quá trình mở rộng, thuật toán thử gán số cầu (0, 1, 2) cho cạnh hiện tại, kết hợp cắt tỉa khi vượt quá số cầu tối đa của đảo hoặc khi tạo cầu chồng (crossing).
+    \item Thuật toán sử dụng bộ nhớ để lưu trạng thái đã duyệt nhằm tránh lặp lại.
+    \item Thuật toán giới hạn thời gian thực thi để tránh chạy quá lâu.
 \end{itemize}
 
-\paragraph{Ý tưởng chính:}
+\paragraph{Ưu điểm heuristic}
+
 \begin{itemize}
-    \item Mỗi trạng thái trong tìm kiếm là một ánh xạ (dictionary) biểu diễn gán giá trị True/False cho một số biến.
-    \item \textbf{Heuristic}: số lượng clause chưa chắc chắn thỏa (chưa có literal True, hoặc chưa bị xung đột).
-    \item Thuật toán mở rộng trạng thái bằng cách chọn biến chưa gán nhỏ nhất và thử gán True hoặc False, loại bỏ các trạng thái gây mâu thuẫn (conflict).
-    \item Sử dụng \texttt{heapq} để quản lý hàng đợi ưu tiên theo giá trị \( f = g + h \).
-    \item Lưu tập trạng thái đã duyệt để tránh lặp.
-    \item Giới hạn thời gian chạy bằng timeout.
+    \item Heuristic đảm bảo tính admissible (không đánh giá quá cao chi phí còn lại), giúp A* tìm kiếm hiệu quả.
+    \item Cắt tỉa look-ahead giúp phát hiện sớm các nhánh vô vọng, giảm đáng kể số node cần duyệt.
+    \item Kiểm tra crossing loại bỏ các trạng thái không hợp lệ về mặt hình học của cầu.
 \end{itemize}
 
 \begin{algorithm}[H]
 \caption{A* SAT Solver cho bài toán Hashiwokakero}
-\KwIn{Danh sách clause \texttt{clauses}, số biến \(n\), thời gian timeout \(T\)}
-\KwOut{Nghiệm gán biến thỏa mãn CNF hoặc báo thất bại}
+\KwIn{Danh sách cạnh \texttt{edges}, thông tin đảo \texttt{islands}, ánh xạ biến \texttt{var\_map}, thời gian timeout \(T\)}
+\KwOut{Mô hình gán biến thỏa CNF hoặc báo thất bại}
 
-Khởi tạo hàng đợi ưu tiên \texttt{frontier} \\
-Khởi tạo tập trạng thái đã duyệt \texttt{visited} \\
-Khởi tạo trạng thái bắt đầu: ánh xạ gán rỗng \\
-Tính heuristic \(h\) cho trạng thái bắt đầu \\
-Đưa trạng thái bắt đầu vào \texttt{frontier} với độ ưu tiên \(f = g + h = 0 + h\) \\
+Khởi tạo trạng thái bắt đầu: chưa gán cầu, số cầu mỗi đảo là 0 \\
+Tính heuristic trạng thái bắt đầu \\
+Khởi tạo hàng đợi ưu tiên \texttt{pq} theo giá trị \( f = g + h \) \\
+Khởi tạo bộ nhớ lưu trạng thái đã duyệt \texttt{visited} \\
 Bắt đầu đếm thời gian \\
 
-\While{\texttt{frontier} không rỗng}{
-    \If{thời gian chạy vượt quá \(T\)}{
-        Trả về thất bại do timeout
-    }
-    Lấy trạng thái có độ ưu tiên thấp nhất: \((f, g, assignment)\) từ \texttt{frontier} \\
-    Tăng biến đếm số node đã mở rộng
-
-    \If{\(assignment\) đã có trong \texttt{visited}}{
-        \textbf{continue}
-    }
-    Thêm \(assignment\) vào \texttt{visited} \\
-
-    \If{trạng thái hiện tại gây mâu thuẫn (conflict)}{
-        \textbf{continue}
-    }
-
-    \If{trạng thái hiện tại thỏa công thức CNF}{
-        Trả về nghiệm \(assignment\)
-    }
-
-    Chọn biến chưa gán nhỏ nhất \(var\) \\
-    \For{\(val \in \{True, False\}\)}{
-        Tạo trạng thái mới \(assignment'\) gán \(var = val\) \\
-        \If{\(assignment'\) không gây mâu thuẫn}{
-            Tính heuristic \(h'\) cho \(assignment'\) \\
-            Đặt \(g' = g + 1\) và \(f' = g' + h'\) \\
-            Đưa trạng thái \((f', g', assignment')\) vào \texttt{frontier}
-        }
-    }
+\While{\texttt{pq} không rỗng}{
+    Lấy trạng thái có \(f\) nhỏ nhất: \((f, h, idx, assignments, degrees)\) \\
+    Nếu thời gian vượt quá \(T\), trả về thất bại do timeout \\
+    Nếu \(idx\) bằng số cạnh, kiểm tra heuristic:
+    \begin{itemize}
+        \item Nếu \(h = 0\) (thỏa), trả về nghiệm
+        \item Ngược lại, bỏ qua trạng thái này
+    \end{itemize}
+    Nếu trạng thái đã duyệt, bỏ qua \\
+    Đánh dấu trạng thái hiện tại đã duyệt \\
+    Thử gán số cầu 0, 1, 2 cho cạnh \(idx\), với các điều kiện:
+    \begin{itemize}
+        \item Không vượt quá số cầu tối đa tại đảo liên quan
+        \item Không tạo crossing với cầu đã gán
+        \item Tính lại heuristic trạng thái mới, bỏ qua nếu dead-end
+    \end{itemize}
+    Đưa trạng thái mới vào hàng đợi \texttt{pq}
 }
-
-Trả về thất bại do không tìm thấy nghiệm hợp lệ
+Trả về thất bại do không tìm được nghiệm hợp lệ
 \end{algorithm}
 
-\paragraph{Đặc điểm triển khai:}
+\paragraph{Thông số đánh giá}
 
+Thuật toán theo dõi:
 \begin{itemize}
-    \item Theo dõi số node đã mở rộng và thời gian chạy để đánh giá hiệu quả thuật toán.
-    \item Sử dụng \texttt{tracemalloc} để theo dõi bộ nhớ đỉnh trong quá trình chạy.
-    \item Ánh xạ trạng thái được lưu dưới dạng tuple các cặp biến-giá trị đã gán, đảm bảo không lặp lại.
-    \item Cắt tỉa nhanh nhờ kiểm tra mâu thuẫn sớm khi mở rộng trạng thái mới.
-    \item Thuật toán chỉ xét một biến chưa gán mỗi lượt để giảm độ phức tạp.
+    \item Số node đã mở rộng (node\_expanded)
+    \item Thời gian chạy
+    \item Mức sử dụng bộ nhớ đỉnh (theo dõi với \texttt{tracemalloc})
+    \item Kết quả giải (thành công hoặc thất bại)
 \end{itemize}
 
 \subsection{Các thuật toán bổ sung để so sánh}
@@ -92,13 +85,10 @@ Trả về thất bại do không tìm thấy nghiệm hợp lệ
 \begin{itemize}
     \item \textbf{Thuật toán A* Graph (Thuật toán A* dựa trên đồ thị)}: Đây là thuật toán A* thuần túy dựa trên biểu diễn đồ thị của bài toán, không chuyển đổi sang công thức SAT. Thuật toán mở rộng các trạng thái bằng cách thêm cầu vào các cạnh, sử dụng hàm heuristic ước lượng chi phí còn lại dựa trên số cầu cần thêm và số thành phần liên thông chưa kết nối đủ. Thuật toán đo lường số node đã mở rộng, thời gian thực thi và mức sử dụng bộ nhớ cao nhất trong quá trình chạy để so sánh hiệu quả với các thuật toán khác.
     \item \textbf{Thuật toán Brute-force (Tìm kiếm toàn diện)}: Đây là phương pháp tìm kiếm tất cả các khả năng có thể gán số cầu trên từng cạnh, không sử dụng bất kỳ kỹ thuật cắt tỉa nào. 
-    
     \item \textbf{Thuật toán Backtracking (Tìm kiếm có cắt tỉa)}: Thuật toán này cải tiến so với brute-force bằng cách kết hợp kỹ thuật cắt tỉa (pruning) để loại bỏ sớm các nhánh tìm kiếm không khả thi dựa trên các ràng buộc như giới hạn số cầu tại đảo và tránh tạo cầu chồng. Việc cắt tỉa giúp giảm đáng kể không gian tìm kiếm và tăng tốc độ xử lý so với brute-force thuần túy.
-    
     \item \textbf{Thuật toán Backtracking Graph}: Thuật toán duy trì trạng thái hiện tại dưới dạng một đồ thị với các đảo và các cầu đã xây dựng, đồng thời kiểm tra tính kết nối và giới hạn cầu tại mỗi đảo trong quá trình tìm kiếm. 
 \end{itemize}
 
 Nhờ có các thuật toán bổ sung này, nhóm có thể đánh giá toàn diện hiệu quả của A* về mặt thời gian xử lý, bộ nhớ sử dụng và khả năng mở rộng, từ đó lựa chọn thuật toán phù hợp nhất cho các trường hợp cụ thể trong bài toán Hashiwokakero.
 
-Các thuật toán này giúp so sánh hiệu năng về tốc độ và bộ nhớ sử dụng.
-
+Các thuật toán này giúp so sánh hiệu năng về tốc độ và bộ nhớ sử dụng
