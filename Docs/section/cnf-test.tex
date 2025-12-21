@@ -1,0 +1,88 @@
+\section{Sinh công thức CNF }
+
+Xét bảng $4\times4$ với bốn đảo nằm ở bốn góc, có giá trị:
+\[
+\begin{matrix}
+2 & 0 & 0 & 2\\
+0 & 0 & 0 & 0\\
+0 & 0 & 0 & 0\\
+2 & 0 & 0 & 2
+\end{matrix}
+\]
+
+Đánh số các đảo như sau:
+\begin{itemize}
+  \item Đảo $1$: $(1,1)$, $\deg(1)=2$
+  \item Đảo $2$: $(1,4)$, $\deg(2)=2$
+  \item Đảo $3$: $(4,1)$, $\deg(3)=2$
+  \item Đảo $4$: $(4,4)$, $\deg(4)=2$
+\end{itemize}
+
+\paragraph{Biến cầu.}
+Các cặp đảo có thể nối cầu là:
+\[
+(1,2),\ (1,3),\ (2,4),\ (3,4).
+\]
+Với mỗi cặp $(i,j)$, ta có hai biến Boolean $C_{i,j}^1$ và $C_{i,j}^2$.
+
+\paragraph{Giới hạn số cầu giữa hai đảo.}
+Mỗi cặp đảo có tối đa hai cầu:
+\[
+\neg C_{i,j}^1 \lor \neg C_{i,j}^2,
+\quad \forall (i,j)\in\{(1,2),(1,3),(2,4),(3,4)\}.
+\]
+
+\paragraph{Ràng buộc không cắt nhau.}
+Các cầu ngang và dọc cắt nhau tại cùng một ô không được đồng thời tồn tại.  
+Ví dụ với các cầu $(1,2)$ và $(1,3)$:
+\[
+(\neg C_{1,2}^a \lor \neg C_{1,3}^b), \quad a,b\in\{1,2\}.
+\]
+Các mệnh đề tương tự được sinh cho các cặp:
+\[
+(1,2)\ \text{với}\ (2,4), \quad
+(3,4)\ \text{với}\ (1,3), \quad
+(3,4)\ \text{với}\ (2,4).
+\]
+
+\paragraph{Ràng buộc bậc của đảo.}
+Tập các biến cầu liên quan đến đảo $1$ là:
+\[
+B(1)=\{C_{1,2}^1,C_{1,2}^2,C_{1,3}^1,C_{1,3}^2\}.
+\]
+Điều kiện tổng số cầu bằng $\deg(1)=2$ được biểu diễn bởi:
+\[
+\bigwedge_{\substack{S\subseteq B(1)\\|S|=3}}
+\bigvee_{x\in S}\neg x
+\quad \land \quad
+\bigwedge_{\substack{S\subseteq B(1)\\|S|=3}}
+\bigvee_{x\in S} x.
+\]
+Các ràng buộc tương tự được áp dụng cho các đảo $2,3,4$ với các tập biến:
+\[
+\begin{aligned}
+B(2)&=\{C_{1,2}^1,C_{1,2}^2,C_{2,4}^1,C_{2,4}^2\},\\
+B(3)&=\{C_{1,3}^1,C_{1,3}^2,C_{3,4}^1,C_{3,4}^2\},\\
+B(4)&=\{C_{2,4}^1,C_{2,4}^2,C_{3,4}^1,C_{3,4}^2\}.
+\end{aligned}
+\]
+
+\paragraph{Ràng buộc liên thông (cây khung).}
+Gốc $1$ không có cha:
+\[
+\neg Par(1,j), \quad \forall j\neq 1.
+\]
+Mỗi đỉnh khác gốc có đúng một cha. Ví dụ với đảo $2$:
+\[
+(Par(2,1)\lor Par(2,4)) \land (\neg Par(2,1)\lor \neg Par(2,4)).
+\]
+Quan hệ cha--con yêu cầu tồn tại cầu:
+\[
+\neg Par(i,j)\lor C_{i,j}^1\lor C_{i,j}^2.
+\]
+Cuối cùng, loại bỏ chu trình:
+\[
+\neg Par(i,j)\lor \neg Par(j,i), \quad \forall i\neq j.
+\]
+
+Tất cả các mệnh đề trên được kết hợp bằng phép hội để tạo thành công thức CNF cho test đã cho.
