@@ -1,0 +1,18 @@
+\section{Các phương pháp giải bài toán}
+
+Phần này mô tả các phương pháp giải bài toán thỏa mãn mệnh đề (SAT) được ở trên, đặc biệt áp dụng cho bài toán Hashiwokakero.
+
+\subsection{Sử dụng thư viện PySAT}
+PySAT là thư viện Python cung cấp giao diện đơn giản đến nhiều bộ giải SAT khác nhau. Chúng tôi sử dụng PySAT để giải tự động các công thức CNF sinh ra từ các ràng buộc bài toán.
+
+\subsection{Thuật toán tìm kiếm A* cho SAT}
+Chúng tôi triển khai thuật toán A* để giải bài toán SAT mà không phụ thuộc vào thư viện bên ngoài, sử dụng hàm heuristic để hướng đến nghiệm thỏa mãn.
+
+\subsection{Các thuật toán bổ sung để so sánh}
+Để đánh giá hiệu quả của A*, nhóm còn triển khai:
+\begin{itemize}
+    \item Thuật toán Brute-force: tìm kiếm tất cả các khả năng có thể.
+    \item Thuật toán Backtracking: tìm kiếm có cắt tỉa để giảm không gian tìm kiếm.
+\end{itemize}
+Các thuật toán này giúp so sánh hiệu năng về tốc độ và bộ nhớ sử dụng.
+
