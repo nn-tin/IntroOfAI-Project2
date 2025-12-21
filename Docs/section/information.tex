@@ -11,13 +11,14 @@
 \subsection{Phân chia công việc}
 \begin{longtblr}[caption={Phân chia công việc}]{colspec={ccccc},vlines,hlines}
     \SetRow{c,font=\bfseries} \SetCell[c=2]{}\diagbox{Công việc}{Thành viên} & & H.~N.~Quí & N.~N.~Tin & N.~D.~Bảo & H.~T.~An\\
-    \SetCell[r=6]{} Thuật toán & ACO & & & 100\%\\
+    \SetCell[c=2]{} CNF & &100\% & 100\% & 100\% & 100\% \\
+    \SetCell[r=6]{} Thuật toán & Py-Sat & & & 100\%\\
     
-    & ABC & & & 100\% \\
-    & PCO & & 100\% \\
-    & Cuckoo & & 100\% \\
-    & Firefly & 100\% \\
-    & Cổ điển & 100\% \\
+    & A* & & & 100\% \\
+    & A* graph & & 100\% \\
+    & Backtracking & & 100\% \\
+    & Backtracking graph & 100\% \\
+    & Brute force & 100\% \\
     \SetCell[c=2]{} Báo cáo & &100\% & 100\% & 100\% & 100\% \\
     \SetCell[c=2]{} Demo & & & & & 100\% \\
 \end{longtblr}
@@ -29,19 +30,21 @@ Bảng~\ref{tab:completion-rate} mô tả nhóm tự đánh giá mức độ ho�
 	\centering
 	\caption{Mức độ hoàn thành đồ án.}
 	\label{tab:completion-rate}
-\begin{tblr}{colspec={cX[h,l]c},vlines,hlines,rowhead=1}
-    \SetRow{c,font=\bfseries} \SetCell[c=2]{}Công việc & & Phần trăm\\
-    \SetCell[r=7]{}Báo cáo & Algorithm descriptions with mathematical
-formulations & 100\% \\
-    & Implementation details and design decisions & 100\% \\
-    & Experimental methodology and test configurations & 100\% \\
-    & Results analysis with tables and charts & 100\% \\
-    & Comparative analysis and discussion & 100\% \\
-    & Conclusions and insights learned & 100\% \\
-    & Minimum 25 pages & 100\% \\
-    \SetCell[r=3]{} Mã nguồn & Well-structured Python implementation of all swarm algorithms & 100\% \\
-    & mplementation of traditional search algorithms for comparison & 100\% \\
-    & README with setup instructions and usage examples. And uploaded it on Github & 100\% \\
-    Demo & Short video demo uploaded on Youtube at least 5 minutes. & 100\% 
+\begin{tblr}{colspec={cX[l]c},vlines,hlines,rowhead=1}
+    \SetRow{c,font=\bfseries} No & Tiêu chí & Mức độ hoàn thành \\
+    1 & Mô tả đúng nguyên lý logic để tạo CNF & 95\% \\
+    2 & Tự động sinh CNF & 100\% \\
+    3 & Sử dụng thư viện PySAT để giải CNF chính xác & 100\% \\
+    4 & Triển khai thuật toán A* để giải CNF không dùng thư viện & 100\% \\
+    5 & Triển khai thuật toán bổ sung để so sánh với A*: \newline
+        1) Thuật toán Brute-force so sánh tốc độ \newline
+        2) Thuật toán Backtracking so sánh tốc độ & 100\% \\
+    6 & Báo cáo và phân tích: \newline
+        1) Viết báo cáo chi tiết \newline
+        2) Phân tích kỹ và thực nghiệm \newline
+        3) Cung cấp ít nhất 10 bộ test với kích thước khác nhau (7 $\times$ 7, 9 $\times$ 9, 11 $\times$ 11, 13 $\times$ 13, 17 $\times$ 17, 20 $\times$ 20) \newline
+        4) So sánh kết quả và hiệu năng & 96\%
 \end{tblr}
 \end{table}
+
+
