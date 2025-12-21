@@ -32,8 +32,8 @@ from solver_backtracking_graph import BacktrackingGraphSolver
 # ================= CONFIG =================
 TIMEOUT_PYSAT = 60.0
 TIMEOUT_ASTAR = 60.0
-TIMEOUT_BACKTRACK = 60.0
-TIMEOUT_BRUTEFORCE = 60.0
+TIMEOUT_BACKTRACK = 180.0
+TIMEOUT_BRUTEFORCE = 180.0
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INPUTS_DIR = os.path.join(BASE_DIR, "Inputs")
