@@ -10,97 +10,79 @@ Trong đồ án này, chúng em đã sử dụng PySAT với solver Glucose3 đ�
 
 \subsection{Thuật toán A* giải SAT cho bài toán Hashiwokakero}
 
- Thuật toán A* tìm lời giải bằng cách thử lần lượt số cầu (0, 1, 2) trên các cạnh giữa đảo, sử dụng hàm heuristic ước lượng chi phí còn lại để ưu tiên mở rộng trạng thái khả thi nhất, đồng thời loại bỏ các trường hợp không hợp lệ như vượt quá số cầu hoặc cầu chồng nhau. Thuật toán dừng khi tìm được giải pháp thỏa mãn hoặc hết thời gian.
+Thuật toán sử dụng phương pháp tìm kiếm theo A* trên không gian trạng thái các gán biến cho công thức CNF biểu diễn bài toán Hashiwokakero.
 
-\textbf{Mô tả heuristic:}
+\paragraph{Input:}
+\begin{itemize}
+    \item Công thức CNF dưới dạng danh sách các clause, mỗi clause là danh sách literal (biến hoặc phủ định biến).
+    \item Số biến tối đa trong công thức.
+    \item Thời gian timeout để tránh chạy quá lâu.
+\end{itemize}
 
-Cho tập đảo \( I = \{1, 2, \dots, n\} \), với mỗi đảo \( i \) có số cầu yêu cầu là \( val_i \), và trạng thái hiện tại có số cầu đã nối là \( deg_i \).
-
-Heuristic \( h \) tại bước \( k \) được tính như sau:
-
-\[
-h(k) = \sum_{i=1}^n \max\big(0, val_i - deg_i\big)
-\]
-
-Nếu tồn tại đảo \( i \) sao cho số cầu còn thiếu \( val_i - deg_i \) lớn hơn tổng số cầu tối đa có thể nối từ các cạnh chưa xét, thì
-
-\[
-h(k) = +\infty
-\]
-
-để loại bỏ trạng thái này khỏi quá trình tìm kiếm.
-
-\textbf{Mã giả:}
+\paragraph{Ý tưởng chính:}
+\begin{itemize}
+    \item Mỗi trạng thái trong tìm kiếm là một ánh xạ (dictionary) biểu diễn gán giá trị True/False cho một số biến.
+    \item \textbf{Heuristic}: số lượng clause chưa chắc chắn thỏa (chưa có literal True, hoặc chưa bị xung đột).
+    \item Thuật toán mở rộng trạng thái bằng cách chọn biến chưa gán nhỏ nhất và thử gán True hoặc False, loại bỏ các trạng thái gây mâu thuẫn (conflict).
+    \item Sử dụng \texttt{heapq} để quản lý hàng đợi ưu tiên theo giá trị \( f = g + h \).
+    \item Lưu tập trạng thái đã duyệt để tránh lặp.
+    \item Giới hạn thời gian chạy bằng timeout.
+\end{itemize}
 
 \begin{algorithm}[H]
-\caption{A* SAT-based Solver for Hashiwokakero}
-\KwIn{CNF formula \texttt{cnf}, metadata \texttt{meta}, timeout \texttt{T}}
-\KwOut{Solution model or failure}
+\caption{A* SAT Solver cho bài toán Hashiwokakero}
+\KwIn{Danh sách clause \texttt{clauses}, số biến \(n\), thời gian timeout \(T\)}
+\KwOut{Nghiệm gán biến thỏa mãn CNF hoặc báo thất bại}
 
-Initialize priority queue \texttt{pq} \\
-Initialize visited set \texttt{visited} \\
-Set start state: no edges assigned, degrees of islands all zero \\
-Compute heuristic \texttt{h} for start state \\
-Push start state into \texttt{pq} with priority = heuristic \\
-Start timer \\
-  
-\While{\texttt{pq} not empty}{
-    \If{elapsed time $>$ T}{
-        \Return failure due to timeout
+Khởi tạo hàng đợi ưu tiên \texttt{frontier} \\
+Khởi tạo tập trạng thái đã duyệt \texttt{visited} \\
+Khởi tạo trạng thái bắt đầu: ánh xạ gán rỗng \\
+Tính heuristic \(h\) cho trạng thái bắt đầu \\
+Đưa trạng thái bắt đầu vào \texttt{frontier} với độ ưu tiên \(f = g + h = 0 + h\) \\
+Bắt đầu đếm thời gian \\
+
+\While{\texttt{frontier} không rỗng}{
+    \If{thời gian chạy vượt quá \(T\)}{
+        Trả về thất bại do timeout
     }
-    Pop state with lowest priority from \texttt{pq}: \\
-    \quad $(f, h, idx, assignments, degrees) \leftarrow$ pop from \texttt{pq} \\
-    
-    \If{$h = \infty$}{
-        \textbf{continue} to next iteration \tcp*{dead end, prune}
-    }
-    
-    \If{$idx$ equals number of edges}{
-        \If{$h = 0$}{
-            \Return \texttt{assignments} as solution
-        }
+    Lấy trạng thái có độ ưu tiên thấp nhất: \((f, g, assignment)\) từ \texttt{frontier} \\
+    Tăng biến đếm số node đã mở rộng
+
+    \If{\(assignment\) đã có trong \texttt{visited}}{
         \textbf{continue}
     }
-    
-    \If{state $(idx, degrees)$ in \texttt{visited}}{
+    Thêm \(assignment\) vào \texttt{visited} \\
+
+    \If{trạng thái hiện tại gây mâu thuẫn (conflict)}{
         \textbf{continue}
     }
-    Add state $(idx, degrees)$ to \texttt{visited} \\
-    
-    edge $\leftarrow$ edges[idx] \\
-    nodes $u, v \leftarrow$ endpoints of edge \\
-    
-    \For{$val$ in $\{0,1,2\}$}{
-        new\_degrees $= degrees$ updated by adding $val$ to $u$ and $v$ \\
-        \If{new\_degrees exceed island requirements}{
-            \textbf{continue} \tcp*{prune invalid}
+
+    \If{trạng thái hiện tại thỏa công thức CNF}{
+        Trả về nghiệm \(assignment\)
+    }
+
+    Chọn biến chưa gán nhỏ nhất \(var\) \\
+    \For{\(val \in \{True, False\}\)}{
+        Tạo trạng thái mới \(assignment'\) gán \(var = val\) \\
+        \If{\(assignment'\) không gây mâu thuẫn}{
+            Tính heuristic \(h'\) cho \(assignment'\) \\
+            Đặt \(g' = g + 1\) và \(f' = g' + h'\) \\
+            Đưa trạng thái \((f', g', assignment')\) vào \texttt{frontier}
         }
-        \If{$val > 0$ and crossing with previous assigned edges}{
-            \textbf{continue} \tcp*{prune invalid}
-        }
-        new\_heuristic = calculate heuristic for next index and new\_degrees \\
-        \If{new\_heuristic == $\infty$}{
-            \textbf{continue} \tcp*{prune dead-end}
-        }
-        new\_assignments = assignments updated with $val$ at idx \\
-        g = idx + 1 \\
-        f = g + new\_heuristic \\
-        Push $(f, new\_heuristic, idx + 1, new\_assignments, new\_degrees)$ into \texttt{pq} \\
     }
 }
 
-\Return failure \tcp*{no solution found within timeout}
+Trả về thất bại do không tìm thấy nghiệm hợp lệ
 \end{algorithm}
 
-
-
-\textbf{Đặc điểm triển khai:}
+\paragraph{Đặc điểm triển khai:}
 
 \begin{itemize}
+    \item Theo dõi số node đã mở rộng và thời gian chạy để đánh giá hiệu quả thuật toán.
     \item Sử dụng \texttt{tracemalloc} để theo dõi bộ nhớ đỉnh trong quá trình chạy.
-    \item Giới hạn thời gian (timeout) để tránh chạy quá lâu.
-    \item Lưu trữ và kiểm tra trạng thái đã duyệt nhằm tránh lặp lại.
-    \item Phân tách thuật toán thành các hàm riêng để kiểm tra giao nhau cầu và định dạng nghiệm.
+    \item Ánh xạ trạng thái được lưu dưới dạng tuple các cặp biến-giá trị đã gán, đảm bảo không lặp lại.
+    \item Cắt tỉa nhanh nhờ kiểm tra mâu thuẫn sớm khi mở rộng trạng thái mới.
+    \item Thuật toán chỉ xét một biến chưa gán mỗi lượt để giảm độ phức tạp.
 \end{itemize}
 
 \subsection{Các thuật toán bổ sung để so sánh}
