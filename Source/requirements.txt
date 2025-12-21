@@ -1,1 +1,5 @@
-python-sat
+python-sat[pblib,aiger]
+numpy
+pandas
+matplotlib
+jupyter

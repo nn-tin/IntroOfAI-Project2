@@ -1,0 +1,7 @@
+filename,solver,sat,time,node_expanded,timeout,connected
+input-02.txt,pysat,True,0.0005092000064905733,,False,True
+input-02.txt,astar,True,0.13823879999108613,84,False,True
+input-02.txt,astar_graph,True,0.1492452999955276,71,False,True
+input-02.txt,backtracking,False,60.08469210000476,,True,False
+input-02.txt,backtracking_graph,False,60.010374500008766,,True,False
+input-02.txt,bruteforce,False,60.077732500009006,,True,False

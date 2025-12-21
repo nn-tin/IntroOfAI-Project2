@@ -87,12 +87,12 @@ def run_astar_proc(cnf, meta):
 
 
 def run_backtracking_proc(cnf, meta):
-    solver = BacktrackingSAT(cnf, meta, timeout=None)
+    solver = BacktrackingSAT(cnf, meta, timeout=TIMEOUT_BACKTRACK)
     return solver.solve()
 
 
 def run_bruteforce_proc(cnf, meta):
-    solver = BruteForceSAT(cnf, meta, timeout=None)
+    solver = BruteForceSAT(cnf, meta, timeout=TIMEOUT_BRUTEFORCE)
     return solver.solve()
 
 
@@ -190,8 +190,38 @@ def experiment_on_file(
             "timeout": timed_out,
             "connected": connected,
         })
+    def convert_solution_to_bridges(solution, meta):
+        bridges = []
+        islands = meta["islands"]
+        for edge in solution:
+            u, v, count = edge['u'], edge['v'], edge['count']
 
-    # ---------- A* GRAPH ----------
+            x1, y1 = islands[u]['c'], islands[u]['r']
+            x2, y2 = islands[v]['c'], islands[v]['r']
+
+            if x1 == x2:
+                dir_ = "V"
+                x = x1
+                y = min(y1, y2)
+            elif y1 == y2:
+                dir_ = "H"
+                x = min(x1, x2)
+                y = y1
+            else:
+                # Nếu cầu không thẳng hàng, bỏ qua
+                continue
+
+            bridges.append({
+                "u": u,
+                "v": v,
+                "x": x,
+                "y": y,
+                "count": count,
+                "dir": dir_,
+            })
+        return bridges
+
+   # ---------- A* GRAPH ----------
     if "astar_graph" in solvers:
         print("-> Running A* Graph...")
         ok, result, elapsed, timed_out = run_with_timeout(
@@ -210,6 +240,12 @@ def experiment_on_file(
                 check_connectivity(meta["islands"], solution)
                 if solution else False
             )
+            if sat:
+               if sat:
+                bridges = convert_solution_to_bridges(solution, meta)
+                grid = build_output_grid(board, meta, bridges)
+                fname = input_filename.replace("input", "output").replace(".txt", "-astar_graph.txt")
+                export_output_grid(grid, fname)
         else:
             if isinstance(result, dict):
                 node_expanded = result.get("node_expanded")
@@ -223,6 +259,7 @@ def experiment_on_file(
             "timeout": timed_out,
             "connected": connected,
         })
+
 
 
     # ---------- Backtracking SAT ----------
@@ -270,6 +307,7 @@ def experiment_on_file(
         sat = False
         connected = False
         node_expanded = None
+
         if ok and isinstance(result, dict):
             node_expanded = result.get("node_expanded")
             solution = result.get("solution")
@@ -278,6 +316,14 @@ def experiment_on_file(
                 check_connectivity(meta["islands"], solution)
                 if solution else False
             )
+
+            if sat:
+                bridges = convert_solution_to_bridges(solution, meta)
+                grid = build_output_grid(board, meta, bridges)
+                fname = input_filename.replace(
+                    "input", "output"
+                ).replace(".txt", "-backtracking_graph.txt")
+                export_output_grid(grid, fname)
         else:
             if isinstance(result, dict):
                 node_expanded = result.get("node_expanded")
@@ -291,7 +337,7 @@ def experiment_on_file(
             "timeout": timed_out,
             "connected": connected,
         })
-
+    
     # ---------- Brute-force SAT ----------
     if "bruteforce" in solvers:
         print("-> Running Brute-force SAT...")
@@ -364,18 +410,28 @@ if __name__ == "__main__":
     mp.freeze_support()
 
     if len(sys.argv) == 1:
+        # Chạy tất cả file input, lưu file tổng hợp mặc định
         run_batch()
     elif len(sys.argv) == 2:
         arg = sys.argv[1].lower()
         if arg == "all":
             run_batch()
         elif arg.endswith(".txt"):
-            run_batch([arg])
+            # Lưu kết quả vào file CSV riêng cho từng input
+            csv_name = f"experiment_results_{arg.replace('.txt','')}.csv"
+            csv_path = os.path.join(RESULTS_DIR, csv_name)
+            run_batch([arg], out_csv=csv_path)
         else:
             print("Usage: python main.py [input-file.txt | all]")
     else:
         files = [f for f in sys.argv[1:] if f.endswith(".txt")]
         if files:
-            run_batch(files)
+            if len(files) == 1:
+                csv_name = f"experiment_results_{files[0].replace('.txt','')}.csv"
+                csv_path = os.path.join(RESULTS_DIR, csv_name)
+                run_batch(files, out_csv=csv_path)
+            else:
+                # Nhiều file -> lưu file tổng hợp
+                run_batch(files)
         else:
             print("Usage: python main.py [input-file.txt | all]")
