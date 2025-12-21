@@ -1,18 +1,122 @@
 \section{Các phương pháp giải bài toán}
 
-Phần này mô tả các phương pháp giải bài toán thỏa mãn mệnh đề (SAT) được ở trên, đặc biệt áp dụng cho bài toán Hashiwokakero.
+Phần này mô tả các phương pháp nhóm em đã sử dụng để giải bài toán thỏa mãn mệnh đề (SAT) ở trên sau khi đã chuyển bài toán Hashiwokakero về dạng mệnh đề SAT dưới dạng CNF .
 
-\subsection{Sử dụng thư viện PySAT}
-PySAT là thư viện Python cung cấp giao diện đơn giản đến nhiều bộ giải SAT khác nhau. Chúng tôi sử dụng PySAT để giải tự động các công thức CNF sinh ra từ các ràng buộc bài toán.
+\subsection{PySAT}
 
-\subsection{Thuật toán tìm kiếm A* cho SAT}
-Chúng tôi triển khai thuật toán A* để giải bài toán SAT mà không phụ thuộc vào thư viện bên ngoài, sử dụng hàm heuristic để hướng đến nghiệm thỏa mãn.
+PySAT là một thư viện Python cung cấp giao diện đơn giản để tương tác với nhiều bộ giải SAT hiệu quả, trong đó có Glucose3 — một solver SAT hiện đại dựa trên thuật toán Conflict-Driven Clause Learning (CDCL), nổi bật về tốc độ và khả năng xử lý các công thức CNF phức tạp.
+
+Trong đồ án này, chúng em đã sử dụng PySAT với solver Glucose3 để giải các công thức CNF biểu diễn các ràng buộc của bài toán Hashiwokakero. 
+
+\subsection{Thuật toán A* giải SAT cho bài toán Hashiwokakero}
+
+ Thuật toán A* tìm lời giải bằng cách thử lần lượt số cầu (0, 1, 2) trên các cạnh giữa đảo, sử dụng hàm heuristic ước lượng chi phí còn lại để ưu tiên mở rộng trạng thái khả thi nhất, đồng thời loại bỏ các trường hợp không hợp lệ như vượt quá số cầu hoặc cầu chồng nhau. Thuật toán dừng khi tìm được giải pháp thỏa mãn hoặc hết thời gian.
+
+\textbf{Mô tả heuristic:}
+
+Cho tập đảo \( I = \{1, 2, \dots, n\} \), với mỗi đảo \( i \) có số cầu yêu cầu là \( val_i \), và trạng thái hiện tại có số cầu đã nối là \( deg_i \).
+
+Heuristic \( h \) tại bước \( k \) được tính như sau:
+
+\[
+h(k) = \sum_{i=1}^n \max\big(0, val_i - deg_i\big)
+\]
+
+Nếu tồn tại đảo \( i \) sao cho số cầu còn thiếu \( val_i - deg_i \) lớn hơn tổng số cầu tối đa có thể nối từ các cạnh chưa xét, thì
+
+\[
+h(k) = +\infty
+\]
+
+để loại bỏ trạng thái này khỏi quá trình tìm kiếm.
+
+\textbf{Mã giả:}
+
+\begin{algorithm}[H]
+\caption{A* SAT-based Solver for Hashiwokakero}
+\KwIn{CNF formula \texttt{cnf}, metadata \texttt{meta}, timeout \texttt{T}}
+\KwOut{Solution model or failure}
+
+Initialize priority queue \texttt{pq} \\
+Initialize visited set \texttt{visited} \\
+Set start state: no edges assigned, degrees of islands all zero \\
+Compute heuristic \texttt{h} for start state \\
+Push start state into \texttt{pq} with priority = heuristic \\
+Start timer \\
+  
+\While{\texttt{pq} not empty}{
+    \If{elapsed time $>$ T}{
+        \Return failure due to timeout
+    }
+    Pop state with lowest priority from \texttt{pq}: \\
+    \quad $(f, h, idx, assignments, degrees) \leftarrow$ pop from \texttt{pq} \\
+    
+    \If{$h = \infty$}{
+        \textbf{continue} to next iteration \tcp*{dead end, prune}
+    }
+    
+    \If{$idx$ equals number of edges}{
+        \If{$h = 0$}{
+            \Return \texttt{assignments} as solution
+        }
+        \textbf{continue}
+    }
+    
+    \If{state $(idx, degrees)$ in \texttt{visited}}{
+        \textbf{continue}
+    }
+    Add state $(idx, degrees)$ to \texttt{visited} \\
+    
+    edge $\leftarrow$ edges[idx] \\
+    nodes $u, v \leftarrow$ endpoints of edge \\
+    
+    \For{$val$ in $\{0,1,2\}$}{
+        new\_degrees $= degrees$ updated by adding $val$ to $u$ and $v$ \\
+        \If{new\_degrees exceed island requirements}{
+            \textbf{continue} \tcp*{prune invalid}
+        }
+        \If{$val > 0$ and crossing with previous assigned edges}{
+            \textbf{continue} \tcp*{prune invalid}
+        }
+        new\_heuristic = calculate heuristic for next index and new\_degrees \\
+        \If{new\_heuristic == $\infty$}{
+            \textbf{continue} \tcp*{prune dead-end}
+        }
+        new\_assignments = assignments updated with $val$ at idx \\
+        g = idx + 1 \\
+        f = g + new\_heuristic \\
+        Push $(f, new\_heuristic, idx + 1, new\_assignments, new\_degrees)$ into \texttt{pq} \\
+    }
+}
+
+\Return failure \tcp*{no solution found within timeout}
+\end{algorithm}
+
+
+
+\textbf{Đặc điểm triển khai:}
+
+\begin{itemize}
+    \item Sử dụng \texttt{tracemalloc} để theo dõi bộ nhớ đỉnh trong quá trình chạy.
+    \item Giới hạn thời gian (timeout) để tránh chạy quá lâu.
+    \item Lưu trữ và kiểm tra trạng thái đã duyệt nhằm tránh lặp lại.
+    \item Phân tách thuật toán thành các hàm riêng để kiểm tra giao nhau cầu và định dạng nghiệm.
+\end{itemize}
 
 \subsection{Các thuật toán bổ sung để so sánh}
-Để đánh giá hiệu quả của A*, nhóm còn triển khai:
+
+Để đánh giá hiệu quả của A*, nhóm còn triển khai: 
+
 \begin{itemize}
-    \item Thuật toán Brute-force: tìm kiếm tất cả các khả năng có thể.
-    \item Thuật toán Backtracking: tìm kiếm có cắt tỉa để giảm không gian tìm kiếm.
+    \item \textbf{Thuật toán A* Graph (Thuật toán A* dựa trên đồ thị)}: Đây là thuật toán A* thuần túy dựa trên biểu diễn đồ thị của bài toán, không chuyển đổi sang công thức SAT. Thuật toán mở rộng các trạng thái bằng cách thêm cầu vào các cạnh, sử dụng hàm heuristic ước lượng chi phí còn lại dựa trên số cầu cần thêm và số thành phần liên thông chưa kết nối đủ. Thuật toán đo lường số node đã mở rộng, thời gian thực thi và mức sử dụng bộ nhớ cao nhất trong quá trình chạy để so sánh hiệu quả với các thuật toán khác.
+    \item \textbf{Thuật toán Brute-force (Tìm kiếm toàn diện)}: Đây là phương pháp tìm kiếm tất cả các khả năng có thể gán số cầu trên từng cạnh, không sử dụng bất kỳ kỹ thuật cắt tỉa nào. 
+    
+    \item \textbf{Thuật toán Backtracking (Tìm kiếm có cắt tỉa)}: Thuật toán này cải tiến so với brute-force bằng cách kết hợp kỹ thuật cắt tỉa (pruning) để loại bỏ sớm các nhánh tìm kiếm không khả thi dựa trên các ràng buộc như giới hạn số cầu tại đảo và tránh tạo cầu chồng. Việc cắt tỉa giúp giảm đáng kể không gian tìm kiếm và tăng tốc độ xử lý so với brute-force thuần túy.
+    
+    \item \textbf{Thuật toán Backtracking Graph}: Thuật toán duy trì trạng thái hiện tại dưới dạng một đồ thị với các đảo và các cầu đã xây dựng, đồng thời kiểm tra tính kết nối và giới hạn cầu tại mỗi đảo trong quá trình tìm kiếm. 
 \end{itemize}
+
+Nhờ có các thuật toán bổ sung này, nhóm có thể đánh giá toàn diện hiệu quả của A* về mặt thời gian xử lý, bộ nhớ sử dụng và khả năng mở rộng, từ đó lựa chọn thuật toán phù hợp nhất cho các trường hợp cụ thể trong bài toán Hashiwokakero.
+
 Các thuật toán này giúp so sánh hiệu năng về tốc độ và bộ nhớ sử dụng.
 
